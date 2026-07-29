@@ -19,12 +19,12 @@ GladiusEx.defaults = {
         testUnits = {
             ["arena1"] = { health = 350000, maxHealth = 350000, power = 180000, maxPower = 300000, powerType = 0, unitClass = "MAGE", unitRace = "Undead", specID = 64 },
             ["arena2"] = { health = 275000, maxHealth = 320000, power = 10, maxPower = 100, powerType = 2, unitClass = "HUNTER", unitRace = "NightElf", specID = 253 },
-            ["arena3"] = { health = 220000, maxHealth = 350000, power = 175000, maxPower = 300000, powerType = 0, unitClass = "DRUID", unitRace = "Worgen", specID = 105 },
+            ["arena3"] = { health = 220000, maxHealth = 350000, power = 175000, maxPower = 300000, powerType = 0, unitClass = "DRUID", unitRace = "NightElf", specID = 105 },
             ["arena4"] = { health = 240000, maxHealth = 350000, power = 90, maxPower = 110, powerType = 3, unitClass = "ROGUE", unitRace = "Human", specID = 261 },
             ["arena5"] = { health = 100000, maxHealth = 370000, power = 10, maxPower = 100, powerType = 1, unitClass = "WARRIOR", unitRace = "Gnome", specID = 71 },
 
             ["player"] = { health = 250000, maxHealth = 350000, power = 18000, maxPower = 300000, powerType = 0, unitClass = "PRIEST", unitRace = "Draenei", specID = 256 },
-            ["party1"] = { health = 300000, maxHealth = 320000, power = 10000, maxPower = 12000, powerType = 1, unitClass = "WARRIOR", unitRace = "Pandaren", specID = 71 },
+            ["party1"] = { health = 300000, maxHealth = 320000, power = 10000, maxPower = 12000, powerType = 1, unitClass = "WARRIOR", unitRace = "Human", specID = 71 },
             ["party2"] = { health = 220000, maxHealth = 350000, power = 280000, maxPower = 300000, powerType = 0, unitClass = "WARLOCK", unitRace = "Orc", specID = 267 },
             ["party3"] = { health = 100000, maxHealth = 300000, power = 10, maxPower = 100, powerType = 1, unitClass = "WARRIOR", unitRace = "Troll", specID = 71 },
             ["party4"] = { health = 200000, maxHealth = 400000, power = 80, maxPower = 130, powerType = 6, unitClass = "DEATHKNIGHT", unitRace = "Dwarf", specID = 252 },

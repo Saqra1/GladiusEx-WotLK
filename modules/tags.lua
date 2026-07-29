@@ -22,7 +22,7 @@ local UnitPowerMax = Spectate and Spectate.UnitPowerMax or UnitPowerMax
 local UnitExists = Spectate and Spectate.UnitExists or UnitExists
 local UnitIsConnected = Spectate and Spectate.UnitIsConnected or UnitIsConnected
 
-local UnitGetTotalAbsorbs = UnitGetTotalAbsorbs
+local UnitGetTotalAbsorbs = UnitGetTotalAbsorbs or function() return 0 end
 LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
 
 local Tags = GladiusEx:NewGladiusExModule("Tags", {
@@ -1093,22 +1093,22 @@ function Tags:GetBuiltinTagsEvents()
         ["spec"] = "GLADIUSEX_SPEC_UPDATE",
         ["spec:short"] = "GLADIUSEX_SPEC_UPDATE",
 
-        ["health"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH",
-        ["maxhealth"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH",
-        ["health:short"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH",
-        ["maxhealth:short"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH",
-        ["health:percentage"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH",
+        ["health"] = "UNIT_HEALTH UNIT_MAXHEALTH",
+        ["maxhealth"] = "UNIT_HEALTH UNIT_MAXHEALTH",
+        ["health:short"] = "UNIT_HEALTH UNIT_MAXHEALTH",
+        ["maxhealth:short"] = "UNIT_HEALTH UNIT_MAXHEALTH",
+        ["health:percentage"] = "UNIT_HEALTH UNIT_MAXHEALTH",
 
-        ["absorbs"] = "UNIT_ABSORB_AMOUNT_CHANGED",
-        ["absorbs:short"] = "UNIT_ABSORB_AMOUNT_CHANGED",
+        ["absorbs"] = "",
+        ["absorbs:short"] = "",
 
-        ["healthabsorbs"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH UNIT_ABSORB_AMOUNT_CHANGED",
-        ["healthabsorbs:short"] = "UNIT_HEALTH UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH UNIT_ABSORB_AMOUNT_CHANGED",
+        ["healthabsorbs"] = "UNIT_HEALTH UNIT_MAXHEALTH",
+        ["healthabsorbs:short"] = "UNIT_HEALTH UNIT_MAXHEALTH",
 
-        ["power"] = "UNIT_MANA UNIT_ENERGY UNIT_RAGE UNIT_RUNIC GLADIUSEX_UNIT_POWER_FREQUENT UNIT_DISPLAYPOWER",
+        ["power"] = "UNIT_MANA UNIT_ENERGY UNIT_RAGE UNIT_RUNIC_POWER GLADIUSEX_UNIT_POWER_FREQUENT UNIT_DISPLAYPOWER",
         ["maxpower"] = "UNIT_MAXMANA UNIT_MAXENERGY UNIT_MAXRAGE UNIT_MAXRUNIC_POWER UNIT_DISPLAYPOWER",
-        ["power:short"] = "UNIT_MANA UNIT_ENERGY UNIT_RAGE UNIT_RUNIC GLADIUSEX_UNIT_POWER_FREQUENT UNIT_DISPLAYPOWER",
+        ["power:short"] = "UNIT_MANA UNIT_ENERGY UNIT_RAGE UNIT_RUNIC_POWER GLADIUSEX_UNIT_POWER_FREQUENT UNIT_DISPLAYPOWER",
         ["maxpower:short"] = "UNIT_MAXMANA UNIT_MAXENERGY UNIT_MAXRAGE UNIT_MAXRUNIC_POWER UNIT_DISPLAYPOWER",
-        ["power:percentage"] = "UNIT_MANA UNIT_ENERGY UNIT_RAGE UNIT_RUNIC GLADIUSEX_UNIT_POWER_FREQUENT UNIT_DISPLAYPOWER",
+        ["power:percentage"] = "UNIT_MANA UNIT_ENERGY UNIT_RAGE UNIT_RUNIC_POWER GLADIUSEX_UNIT_POWER_FREQUENT UNIT_DISPLAYPOWER",
     }
 end

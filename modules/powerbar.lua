@@ -104,6 +104,7 @@ function PowerBar:UpdateColor(unit, skipPower)
         color = self.db[unit].powerBarColor
     end
     self.frame[unit]:SetStatusBarColor(color.r, color.g, color.b, color.a or 1)
+    self.frame[unit].powerType = powerType
 
     -- update power
     if not skipPower then
@@ -115,8 +116,8 @@ function PowerBar:UpdatePowerEvent(event, unit)
     local power, maxPower = UnitPower(unit), UnitPowerMax(unit)
     self:UpdatePower(unit, power, maxPower)
     
-    local color = self:GetBarColor(powerType)
-    if color ~= self:GetBarColor(UnitPowerType(unit)) then
+    local powerType = GladiusEx:IsTesting(unit) and GladiusEx.testing[unit].powerType or UnitPowerType(unit)
+    if self.frame[unit] and self.frame[unit].powerType ~= powerType then
         self:UpdateColorEvent(event, unit, true)
     end
     GladiusEx:SendMessage(event, unit)

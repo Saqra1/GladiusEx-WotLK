@@ -8,7 +8,7 @@ local UnitHealth, UnitHealthMax = UnitHealth, UnitHealthMax
 local SendChatMessage = SendChatMessage
 local RAID_CLASS_COLORS = RAID_CLASS_COLORS
 local GetSpellInfo = GetSpellInfo
-local GetRealNumPartyMembers, GetRealNumRaidMembers, IsRaidLeader, IsRaidOfficer = GetRealNumPartyMembers, GetRealNumRaidMembers, IsRaidLeader, IsRaidOfficer
+local GetNumPartyMembers, GetNumRaidMembers, IsRaidLeader, IsRaidOfficer = GetNumPartyMembers, GetNumRaidMembers, IsRaidLeader, IsRaidOfficer
 
 local Announcements = GladiusEx:NewGladiusExModule("Announcements", {
         drinks = true,
@@ -22,7 +22,6 @@ local Announcements = GladiusEx:NewGladiusExModule("Announcements", {
 function Announcements:OnEnable()
     -- register events
     self:RegisterEvent("UNIT_HEALTH")
-    self:RegisterEvent("UNIT_HEALTH_FREQUENT", "UNIT_HEALTH")
     self:RegisterEvent("UNIT_AURA")
     self:RegisterEvent("UNIT_SPELLCAST_START")
     self:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -134,7 +133,7 @@ function Announcements:Send(msg, throttle, unit)
     end
 
     -- change destination to party if not raid leader/officer.
-    if dest == "rw" and not IsRaidLeader() and not IsRaidOfficer() and GetNumGroupMembers() > 0 then
+    if dest == "rw" and not IsRaidLeader() and not IsRaidOfficer() and (GetNumPartyMembers() > 0 or GetNumRaidMembers() > 0) then
         dest = "party"
     end
 

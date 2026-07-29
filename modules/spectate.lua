@@ -38,13 +38,11 @@ Spectate.methodsByModule = {
     ["Tags"] = {
         ["GLADIUSEX_SPEC_UPDATE"] = "OnEvent",
         ["UNIT_HEALTH"] = "OnEvent",
-        ["UNIT_HEALTH_FREQUENT"] = "OnEvent",
         ["UNIT_MAXHEALTH"] = "OnEvent",
-        ["UNIT_ABSORB_AMOUNT_CHANGED"] = "OnEvent",
         ["UNIT_MANA"] = "OnEvent",
         ["UNIT_ENERGY"] = "OnEvent",
         ["UNIT_RAGE"] = "OnEvent",
-        ["UNIT_RUNIC"] = "OnEvent",
+        ["UNIT_RUNIC_POWER"] = "OnEvent",
         ["GLADIUSEX_UNIT_POWER_FREQUENT"] = "OnEvent",
         ["UNIT_DISPLAYPOWER"] = "OnEvent",
         ["UNIT_MAXMANA"] = "OnEvent",
@@ -1538,4 +1536,3 @@ Spectate.spectatorFunctions = {
     ["PHP"] = Spectate.SetUnitPetHP, -- Input is the current HP of the pet in % (0 == dead)
     ["PET"] = Spectate.SetUnitPet, -- input is a number 0-46 which maps to a table of pet IDs https://github.com/azerothcore/arena-spectator/blob/master/SunwellAS.lua#L1933
 }
-

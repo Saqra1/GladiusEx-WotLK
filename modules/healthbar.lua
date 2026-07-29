@@ -31,7 +31,6 @@ local HealthBar = GladiusEx:NewGladiusExModule("HealthBar", {
 
 function HealthBar:OnEnable()
     self:RegisterEvent("UNIT_HEALTH", "UpdateHealthEvent")
-    self:RegisterEvent("UNIT_HEALTH_FREQUENT", "UpdateHealthEvent")
     self:RegisterEvent("UNIT_MAXHEALTH", "UpdateHealthEvent")
 
     if not self.frame then
