@@ -47,6 +47,10 @@ local STATE_STEALTH = 2
 local STATE_LEFT = 3
 local RANGE_UPDATE_INTERVAL = 1 / 5
 
+local function ShouldPreserveStealth(button, unit)
+    return button and button.unit_state == STATE_STEALTH and not UnitExists(unit)
+end
+
 -- debugging output
 local log_frame
 local log_table
@@ -560,8 +564,8 @@ function GladiusEx:UpdatePartyFrames()
         if group_members >= i then
 
             self:UpdateUnit(unit)
-            self:UpdateUnitState(unit, false)
             self:ShowUnit(unit)
+            self:UpdateUnitState(unit, false)
 
             -- Do question mark icon!
             if not self:IsTesting() and not UnitExists(unit) then
@@ -601,8 +605,8 @@ function GladiusEx:UpdateArenaFrames()
         local unit = "arena" .. i
         if numOpps >= i then
             self:UpdateUnit(unit)
-            self:UpdateUnitState(unit, UnitExists(unit) == nil)
             self:ShowUnit(unit)
+            self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
 
             -- test environment
             if self:IsTesting(unit) then
@@ -768,8 +772,8 @@ function GladiusEx:ARENA_OPPONENT_UPDATE(event, unit, type)
     if not self:IsArenaUnit(unit) then return end
 
     if type == "seen" then
-        self:UpdateUnitState(unit, false)
         self:ShowUnit(unit)
+        self:UpdateUnitState(unit, false)
         self:CheckArenaSize(unit)
     elseif type == "destroyed" then
         self:UpdateUnitState(unit, false, true)
@@ -867,7 +871,7 @@ function GladiusEx:UNIT_NAME_UPDATE(event, unit)
 
     self:UpdateUnitGUID(event, unit)
     self:CheckArenaSize(unit)
-    self:UpdateUnitState(unit)
+    self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
     self:RefreshUnit(unit)
 end
 
@@ -904,7 +908,7 @@ end
 function GladiusEx:UNIT_HEALTH(event, unit)
     if not self.buttons[unit] then return end
 
-    self:UpdateUnitState(unit, false)
+    self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
 end
 
 local range_check
@@ -920,8 +924,9 @@ local function FrameRangeChecker_OnUpdate(f, elapsed)
         f.elapsed = 0
         local unit = f.unit
 
-        if GladiusEx:IsTesting(unit) then
+        if GladiusEx:IsTesting(unit) or GladiusEx:IsSpectating() then
             f:SetAlpha(1)
+            return
         end
 
         if not UnitExists(unit) then
@@ -929,7 +934,7 @@ local function FrameRangeChecker_OnUpdate(f, elapsed)
             return
         end
 
-        if GladiusEx:IsSpectating() or range_check(unit) then
+        if range_check(unit) then
             f:SetAlpha(1)
         else
             f:SetAlpha(GladiusEx.db[unit].oorAlpha)
@@ -938,24 +943,26 @@ local function FrameRangeChecker_OnUpdate(f, elapsed)
 end
 
 function GladiusEx:UpdateUnitState(unit, stealth, left)
-    if not self.buttons[unit] then return end
+    local button = self.buttons[unit]
+    if not button then return end
 
-    if left or self.buttons[unit].unit_state == STATE_LEFT then 
-        self.buttons[unit].unit_state = STATE_LEFT 
-        self.buttons[unit]:SetScript("OnUpdate", nil)
-        self.buttons[unit]:SetAlpha(self.db[unit].deadAlpha)
+    -- A unit slot can become valid again, so only preserve LEFT while it is unavailable.
+    if left or (button.unit_state == STATE_LEFT and not UnitExists(unit)) then
+        button.unit_state = STATE_LEFT
+        button:SetScript("OnUpdate", nil)
+        button:SetAlpha(self.db[unit].deadAlpha)
     elseif UnitIsDeadOrGhost(unit) then
-        self.buttons[unit].unit_state = STATE_DEAD
-        self.buttons[unit]:SetScript("OnUpdate", nil)
-        self.buttons[unit]:SetAlpha(self.db[unit].deadAlpha)
+        button.unit_state = STATE_DEAD
+        button:SetScript("OnUpdate", nil)
+        button:SetAlpha(self.db[unit].deadAlpha)
     elseif stealth then
-        self.buttons[unit].unit_state = STATE_STEALTH
-        self.buttons[unit]:SetScript("OnUpdate", nil)
-        self.buttons[unit]:SetAlpha(self.db[unit].stealthAlpha)
+        button.unit_state = STATE_STEALTH
+        button:SetScript("OnUpdate", nil)
+        button:SetAlpha(self.db[unit].stealthAlpha)
     else
-        self.buttons[unit].unit_state = STATE_NORMAL
-        self.buttons[unit]:SetScript("OnUpdate", FrameRangeChecker_OnUpdate)
-        FrameRangeChecker_OnUpdate(self.buttons[unit], RANGE_UPDATE_INTERVAL + 1)
+        button.unit_state = STATE_NORMAL
+        button:SetScript("OnUpdate", FrameRangeChecker_OnUpdate)
+        FrameRangeChecker_OnUpdate(button, RANGE_UPDATE_INTERVAL + 1)
     end
 end
 
@@ -1016,7 +1023,7 @@ function GladiusEx:ShowUnit(unit)
         end
     end
 
-    -- show button
+    -- Reset SoftHideUnit; state-aware callers apply their alpha after showing.
     self.buttons[unit]:SetAlpha(1)
     if not self.buttons[unit]:IsShown() then
         if not InCombatLockdown() then
