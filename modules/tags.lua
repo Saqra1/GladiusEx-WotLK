@@ -958,7 +958,9 @@ function Tags:GetBuiltinTags()
             return UnitName(unit) or unit
         end,
         ["name:status"] = function(unit)
-            if not UnitExists(unit) then
+            if GladiusEx:ShouldDisplayUnitAsDead(unit) then
+                return L["DEAD"]
+            elseif not UnitExists(unit) then
                 return unit
             elseif not UnitIsConnected(unit) then
                 return L["OFFLINE"]

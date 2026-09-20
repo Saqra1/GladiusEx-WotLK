@@ -781,7 +781,8 @@ function GladiusEx:ARENA_OPPONENT_UPDATE(event, unit, type)
         self:UpdateUnitState(unit, true)
     elseif type == "cleared" then
         if not self:IsTesting() then
-            self:SoftHideUnit(unit)
+            -- Keep the last known enemy frame visible while its unit data is unavailable.
+            self:UpdateUnitState(unit, true)
         end
     end
     self:RefreshUnit(unit)
@@ -945,16 +946,17 @@ end
 function GladiusEx:UpdateUnitState(unit, stealth, left)
     local button = self.buttons[unit]
     if not button then return end
+    local deadAlpha = arena_units[unit] and 1 or self.db[unit].deadAlpha
 
     -- A unit slot can become valid again, so only preserve LEFT while it is unavailable.
     if left or (button.unit_state == STATE_LEFT and not UnitExists(unit)) then
         button.unit_state = STATE_LEFT
         button:SetScript("OnUpdate", nil)
-        button:SetAlpha(self.db[unit].deadAlpha)
+        button:SetAlpha(deadAlpha)
     elseif UnitIsDeadOrGhost(unit) then
         button.unit_state = STATE_DEAD
         button:SetScript("OnUpdate", nil)
-        button:SetAlpha(self.db[unit].deadAlpha)
+        button:SetAlpha(deadAlpha)
     elseif stealth then
         button.unit_state = STATE_STEALTH
         button:SetScript("OnUpdate", nil)
@@ -976,6 +978,11 @@ end
 
 function GladiusEx:IsPartyUnit(unit)
     return party_units[unit]
+end
+
+function GladiusEx:ShouldDisplayUnitAsDead(unit)
+    local button = self.buttons[unit]
+    return button and (button.unit_state == STATE_DEAD or button.unit_state == STATE_LEFT)
 end
 
 function GladiusEx:TestUnit(unit)
