@@ -476,16 +476,35 @@ function GladiusEx:GetArenaSize(min_size)
 
     -- if this is nil/0 we either have not started or we are spectating
     local alwaysUpPlayers = self:GetAlwaysUpFrameForPlayers()
+    local party_players = self:IsSpectating() and 1 or (GetNumPartyMembers() + 1)
+    local arena_opponents = not self:IsSpectating() and GetNumArenaOpponents() or 0
+
+    -- Unit tokens can briefly carry over while zoning between arenas. Once the
+    -- arena API has a roster count, prefer it over those transient tokens.
+    if arena_opponents and arena_opponents > 0 then
+        local confirmed_size = max(arena_opponents, party_players)
+        if confirmed_size >= 4 then
+            confirmed_size = 5
+        end
+
+        self.confirmedArenaSize = max(self.confirmedArenaSize or 1, confirmed_size)
+        self.seenPlayers = self.confirmedArenaSize
+
+        log("GetArenaSize", min_size, self.seenPlayers, GetNumPartyMembers(),
+            "confirmed by opponents => ", self.seenPlayers)
+
+        return self.seenPlayers
+    end
     
     local seen_enemy_units = 0
     for i = 1, 5 do
-    if UnitExists("arena"..i) then
-        seen_enemy_units = seen_enemy_units + 1
+        if UnitExists("arena"..i) then
+            seen_enemy_units = seen_enemy_units + 1
         end
     end
     
     -- try to guess the minimal possible (current) arena size
-    local min_possible_size = max(min_size or 0, self.seenPlayers or 0, alwaysUpPlayers or 0, self:IsSpectating() and 1 or (GetNumPartyMembers() + 1), seen_enemy_units)
+    local min_possible_size = max(min_size or 0, self.seenPlayers or 0, alwaysUpPlayers or 0, party_players, seen_enemy_units)
 
     log("GetArenaSize", min_size, self.seenPlayers, GetNumPartyMembers(),
         " => ", min_possible_size)
@@ -502,7 +521,7 @@ end
 
 function GladiusEx:CheckArenaSize(unit)
     local min_size = 0
-    if unit then
+    if unit and (self:IsTesting() or self:IsSpectating() or UnitExists(unit)) then
         min_size = self:GetUnitIndex(unit)
     end
 
@@ -695,6 +714,7 @@ function GladiusEx:HideFrames()
     self.party_parent:Hide()
 
     self.arena_size = nil
+    self.confirmedArenaSize = nil
     self.knownSpecs = nil
     self.seenPlayers = nil
 end
