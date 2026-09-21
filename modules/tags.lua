@@ -960,6 +960,8 @@ function Tags:GetBuiltinTags()
         ["name:status"] = function(unit)
             if GladiusEx:ShouldDisplayUnitAsDead(unit) then
                 return L["DEAD"]
+            elseif GladiusEx:ShouldDisplayUnitAsStealthed(unit) then
+                return L["STEALTH"]
             elseif not UnitExists(unit) then
                 return unit
             elseif not UnitIsConnected(unit) then
@@ -1088,7 +1090,7 @@ end
 function Tags:GetBuiltinTagsEvents()
     return {
         ["name"] = "UNIT_NAME_UPDATE",
-        ["name:status"] = "UNIT_HEALTH",
+        ["name:status"] = "UNIT_HEALTH GLADIUSEX_UNIT_STATE",
         ["class"] = "",
         ["class:short"] = "",
         ["race"] = "UNIT_NAME_UPDATE",

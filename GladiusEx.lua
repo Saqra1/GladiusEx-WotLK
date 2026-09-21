@@ -768,6 +768,7 @@ function GladiusEx:CHAT_MSG_SYSTEM(event, msg)
         for unit in pairs(self.buttons) do
        	    if unit and UnitName(unit) and string.find(UnitName(unit), name) and not UnitExists(unit) then    
                 self:UpdateUnitState(unit, false, true)
+                self:RefreshUnit(unit)
             end
         end
     end
@@ -966,14 +967,15 @@ end
 function GladiusEx:UpdateUnitState(unit, stealth, left)
     local button = self.buttons[unit]
     if not button then return end
-    local deadAlpha = arena_units[unit] and 1 or self.db[unit].deadAlpha
+    local previousState = button.unit_state
+    local deadAlpha = (arena_units[unit] or IsActiveBattlefieldArena()) and 1 or self.db[unit].deadAlpha
 
     -- A unit slot can become valid again, so only preserve LEFT while it is unavailable.
     if left or (button.unit_state == STATE_LEFT and not UnitExists(unit)) then
         button.unit_state = STATE_LEFT
         button:SetScript("OnUpdate", nil)
         button:SetAlpha(deadAlpha)
-    elseif UnitIsDeadOrGhost(unit) then
+    elseif UnitIsDeadOrGhost(unit) or (button.unit_state == STATE_DEAD and not UnitExists(unit)) then
         button.unit_state = STATE_DEAD
         button:SetScript("OnUpdate", nil)
         button:SetAlpha(deadAlpha)
@@ -985,6 +987,10 @@ function GladiusEx:UpdateUnitState(unit, stealth, left)
         button.unit_state = STATE_NORMAL
         button:SetScript("OnUpdate", FrameRangeChecker_OnUpdate)
         FrameRangeChecker_OnUpdate(button, RANGE_UPDATE_INTERVAL + 1)
+    end
+
+    if button.unit_state ~= previousState then
+        self:SendMessage("GLADIUSEX_UNIT_STATE", unit)
     end
 end
 
@@ -1003,6 +1009,11 @@ end
 function GladiusEx:ShouldDisplayUnitAsDead(unit)
     local button = self.buttons[unit]
     return button and (button.unit_state == STATE_DEAD or button.unit_state == STATE_LEFT)
+end
+
+function GladiusEx:ShouldDisplayUnitAsStealthed(unit)
+    local button = self.buttons[unit]
+    return button and button.unit_state == STATE_STEALTH
 end
 
 function GladiusEx:TestUnit(unit)

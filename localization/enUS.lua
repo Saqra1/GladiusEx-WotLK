@@ -585,6 +585,7 @@ L["Spec"] = true
 L["Spell name / Macro text"] = true
 L["Spell name"] = true
 L["Stealth alpha"] = true
+L["STEALTH"] = true
 L["Stop testing"] = true
 L["Tag settings"] = true
 L["Tag"] = true
