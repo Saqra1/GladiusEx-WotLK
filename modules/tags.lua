@@ -952,24 +952,44 @@ function Tags:GetTagOptionTable(options, unit, tag, order)
     }
 end
 
+local function GetDisplayName(unit)
+    local name = UnitName(unit)
+    if not GladiusEx:IsArenaUnit(unit) or GladiusEx:IsTesting(unit) then
+        return name or unit, true
+    end
+
+    local button = GladiusEx.buttons[unit]
+    if name and name ~= UNKNOWN and name ~= "" then
+        if button then button.knownName = name end
+        return name, true
+    end
+    if button and button.knownName then
+        return button.knownName, true
+    end
+    return "unknown", false
+end
+
 function Tags:GetBuiltinTags()
     return {
         ["name"] = function(unit)
-            return UnitName(unit) or unit
+            return GetDisplayName(unit)
         end,
         ["name:status"] = function(unit)
-            if GladiusEx:ShouldDisplayUnitAsDead(unit) then
+            local name, known = GetDisplayName(unit)
+            if not known then
+                return name
+            elseif GladiusEx:ShouldDisplayUnitAsDead(unit) then
                 return L["DEAD"]
             elseif GladiusEx:ShouldDisplayUnitAsStealthed(unit) then
                 return L["STEALTH"]
             elseif not UnitExists(unit) then
-                return unit
+                return name
             elseif not UnitIsConnected(unit) then
                 return L["OFFLINE"]
             elseif UnitIsDeadOrGhost(unit) then
                 return L["DEAD"]
             else
-                return UnitName(unit) or unit
+                return name
             end
         end,
         ["class"] = function(unit)

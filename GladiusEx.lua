@@ -3,7 +3,6 @@
 local fn = LibStub("LibFunctional-1.0")
 --local LSR = LibStub("LibSpecRoster-1.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("GladiusEx")
-local RC = LibStub("LibRangeCheck-2.0")
 local LSM = LibStub("LibSharedMedia-3.0")
 local LSD = LibStub("LibSpecDetection-1.0")
 
@@ -45,7 +44,6 @@ local STATE_NORMAL = 0
 local STATE_DEAD = 1
 local STATE_STEALTH = 2
 local STATE_LEFT = 3
-local RANGE_UPDATE_INTERVAL = 1 / 5
 
 local function ShouldPreserveStealth(button, unit)
     return button and button.unit_state == STATE_STEALTH and not UnitExists(unit)
@@ -361,9 +359,6 @@ function GladiusEx:OnEnable()
     -- update roster
     self:UpdateAllGUIDs()
 
-    -- update range checkers
-    self:UpdateRangeCheckers()
-
     -- enable modules
     self:EnableModules()
 
@@ -387,7 +382,6 @@ function GladiusEx:OnEnable()
     self:RegisterEvent("UNIT_PET", "UpdateUnitGUID")
     self:RegisterEvent("UNIT_PORTRAIT_UPDATE", "UpdateUnitGUID")
 
-    RC.RegisterCallback(self, RC.CHECKERS_CHANGED, "UpdateRangeCheckers")
     
     self.dbi.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     self.dbi.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
@@ -705,6 +699,7 @@ function GladiusEx:HideFrames()
         button.class = nil
         button.specID = nil
         button.unit_state = nil
+        button.knownName = nil
 
         -- hide frame
         self:HideUnit(unit)
@@ -933,60 +928,24 @@ function GladiusEx:UNIT_HEALTH(event, unit)
     self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
 end
 
-local range_check
-function GladiusEx:UpdateRangeCheckers()
-    range_check = RC:GetSmartMinChecker(40)
-end
-
-
-local function FrameRangeChecker_OnUpdate(f, elapsed)
-    f.elapsed = f.elapsed + elapsed
-
-    if f.elapsed >= RANGE_UPDATE_INTERVAL then
-        f.elapsed = 0
-        local unit = f.unit
-
-        if GladiusEx:IsTesting(unit) or GladiusEx:IsSpectating() then
-            f:SetAlpha(1)
-            return
-        end
-
-        if not UnitExists(unit) then
-            -- should probably remove the OnUpdate handler here
-            return
-        end
-
-        if range_check(unit) then
-            f:SetAlpha(1)
-        else
-            f:SetAlpha(GladiusEx.db[unit].oorAlpha)
-        end
-    end
-end
-
 function GladiusEx:UpdateUnitState(unit, stealth, left)
     local button = self.buttons[unit]
     if not button then return end
     local previousState = button.unit_state
-    local deadAlpha = (arena_units[unit] or IsActiveBattlefieldArena()) and 1 or self.db[unit].deadAlpha
 
     -- A unit slot can become valid again, so only preserve LEFT while it is unavailable.
     if left or (button.unit_state == STATE_LEFT and not UnitExists(unit)) then
         button.unit_state = STATE_LEFT
-        button:SetScript("OnUpdate", nil)
-        button:SetAlpha(deadAlpha)
     elseif UnitIsDeadOrGhost(unit) or (button.unit_state == STATE_DEAD and not UnitExists(unit)) then
         button.unit_state = STATE_DEAD
-        button:SetScript("OnUpdate", nil)
-        button:SetAlpha(deadAlpha)
     elseif stealth then
         button.unit_state = STATE_STEALTH
-        button:SetScript("OnUpdate", nil)
-        button:SetAlpha(self.db[unit].stealthAlpha)
     else
         button.unit_state = STATE_NORMAL
-        button:SetScript("OnUpdate", FrameRangeChecker_OnUpdate)
-        FrameRangeChecker_OnUpdate(button, RANGE_UPDATE_INTERVAL + 1)
+    end
+
+    if not button.soft_hidden then
+        button:SetAlpha(1)
     end
 
     if button.unit_state ~= previousState then
@@ -1061,7 +1020,8 @@ function GladiusEx:ShowUnit(unit)
         end
     end
 
-    -- Reset SoftHideUnit; state-aware callers apply their alpha after showing.
+    -- Reset SoftHideUnit when a frame becomes visible again.
+    self.buttons[unit].soft_hidden = false
     self.buttons[unit]:SetAlpha(1)
     if not self.buttons[unit]:IsShown() then
         if not InCombatLockdown() then
@@ -1087,6 +1047,7 @@ function GladiusEx:SoftHideUnit(unit)
     end
 
     -- hide the button
+    self.buttons[unit].soft_hidden = true
     self.buttons[unit]:SetAlpha(0)
 end
 
@@ -1107,7 +1068,6 @@ function GladiusEx:CreateUnit(unit)
     local button = CreateFrame("Frame", "GladiusExButtonFrame" .. unit, self:IsArenaUnit(unit) and self.arena_parent or self.party_parent)
     self.buttons[unit] = button
 
-    button.elapsed = 0
     button.unit = unit
 
     button:SetClampedToScreen(true)
@@ -1146,6 +1106,7 @@ function GladiusEx:CreateUnit(unit)
     end)
 
     -- hide
+    button.soft_hidden = true
     button:SetAlpha(0)
     button:Hide()
 
