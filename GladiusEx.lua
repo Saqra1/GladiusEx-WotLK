@@ -936,10 +936,11 @@ function GladiusEx:UpdateUnitState(unit, stealth, left)
     -- A unit slot can become valid again, so only preserve LEFT while it is unavailable.
     if left or (button.unit_state == STATE_LEFT and not UnitExists(unit)) then
         button.unit_state = STATE_LEFT
+    elseif stealth then
+        -- An explicit unseen update must replace stale death data.
+        button.unit_state = STATE_STEALTH
     elseif UnitIsDeadOrGhost(unit) or (button.unit_state == STATE_DEAD and not UnitExists(unit)) then
         button.unit_state = STATE_DEAD
-    elseif stealth then
-        button.unit_state = STATE_STEALTH
     else
         button.unit_state = STATE_NORMAL
     end
