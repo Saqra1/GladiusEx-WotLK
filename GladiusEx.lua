@@ -823,6 +823,11 @@ function GladiusEx:IdentifyUnitSpecialization(event, unit, guid, specID)
 		unit = Spectate:GetUnitIdByGUID(guid)
 	end
 	
+	-- Talent callbacks can arrive after party unit tokens have been reassigned.
+	-- Never apply a result to a unit that now belongs to another GUID.
+	if guid and unit and UnitExists(unit) and UnitGUID(unit) ~= guid then
+		unit = self:GetUnitIdByGUID(guid)
+	end
 	if guid and not unit then
 		unit = self:GetUnitIdByGUID(guid)
 	end
@@ -833,23 +838,31 @@ function GladiusEx:IdentifyUnitSpecialization(event, unit, guid, specID)
 		unit = "player"
 	end
 
-	if not unit or not self.buttons[unit] or self.buttons[unit].specID then return end
+	if not unit or not self.buttons[unit] then return end
 
 	if not specID then
 		specID = LSD:GetSpecID(guid)
 	end
 
-	if not unit or not self.buttons[unit] then return end
+	if not specID then return end
 
-	if specID and not self.buttons[unit].specID then
-		
-		if not self.buttons[unit].class then
-			self:IdentifyUnitClass(unit, true)
-		end
-		
-		self.buttons[unit].specID = specID
+	local button = self.buttons[unit]
+	local _, liveClass = UnitClass(unit)
+	if liveClass then
+		button.class = liveClass
+	elseif not button.class then
+		self:IdentifyUnitClass(unit, true)
+	end
+
+	-- Spec IDs are globally unique by class. Aura inference must not be able
+	-- to put (for example) a warrior spec icon on a priest party frame.
+	local classID = button.class and self.Data.classIDByClassName[button.class]
+	local specClassID = self.Data.specIDToClassID[specID]
+	if classID and specClassID and classID ~= specClassID then return end
+
+	if button.specID ~= specID then
+		button.specID = specID
 		self:SendMessage("GLADIUSEX_SPEC_UPDATE", unit)
-		
 		self:RefreshUnit(unit)
 	end
 end
@@ -914,6 +927,16 @@ function GladiusEx:UpdateUnitGUID(event, unit)
         end
         -- add guid
         local guid = UnitGUID(unit)
+        local button = self.buttons[unit]
+        if guid and button then
+            if button.guid and button.guid ~= guid then
+                button.class = nil
+                button.specID = nil
+                button.knownName = nil
+                self:SendMessage("GLADIUSEX_SPEC_UPDATE", unit)
+            end
+            button.guid = guid
+        end
         guid = guid and guid or unit -- fix for Spectator mode (in which case unit would be a guid itself)
         
         if guid then
