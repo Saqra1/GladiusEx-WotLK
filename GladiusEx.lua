@@ -376,6 +376,7 @@ function GladiusEx:OnEnable()
 
     self:RegisterEvent("UNIT_NAME_UPDATE")
     self:RegisterEvent("UNIT_HEALTH")
+    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self:RegisterEvent("UNIT_MAXHEALTH", "UNIT_HEALTH")
     self:RegisterEvent("PARTY_MEMBERS_CHANGED")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -699,6 +700,8 @@ function GladiusEx:HideFrames()
         button.class = nil
         button.specID = nil
         button.unit_state = nil
+        button.confirmedDead = nil
+        button.guid = nil
         button.knownName = nil
 
         -- hide frame
@@ -789,6 +792,7 @@ function GladiusEx:ARENA_OPPONENT_UPDATE(event, unit, type)
 
     if type == "seen" then
         self:ShowUnit(unit)
+        self:UpdateUnitGUID(event, unit)
         self:UpdateUnitState(unit, false)
         self:CheckArenaSize(unit)
     elseif type == "destroyed" then
@@ -951,20 +955,51 @@ function GladiusEx:UNIT_HEALTH(event, unit)
     self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
 end
 
-function GladiusEx:UpdateUnitState(unit, stealth, left)
+function GladiusEx:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, sourceGUID, sourceName, sourceFlags, destGUID)
+    if eventType ~= "UNIT_DIED" or not IsActiveBattlefieldArena() then return end
+
+    local unit = self:GetUnitIdByGUID(destGUID)
+    if not unit then
+        for arenaUnit in pairs(arena_units) do
+            local button = self.buttons[arenaUnit]
+            if button and button.guid == destGUID then
+                unit = arenaUnit
+                break
+            end
+        end
+    end
+    if not self:IsArenaUnit(unit) then return end
+
+    self:UpdateUnitState(unit, false, false, true)
+    self:RefreshUnit(unit)
+end
+
+function GladiusEx:UpdateUnitState(unit, stealth, left, dead)
     local button = self.buttons[unit]
     if not button then return end
     local previousState = button.unit_state
+    local unitExists = UnitExists(unit)
+    local isDead = unitExists and UnitIsDeadOrGhost(unit)
 
-    -- A unit slot can become valid again, so only preserve LEFT while it is unavailable.
-    if left or (button.unit_state == STATE_LEFT and not UnitExists(unit)) then
+    -- Only combat-log confirmation may preserve death after the unit token
+    -- disappears; UnitIsDeadOrGhost can briefly retain stale data.
+    if left or (button.unit_state == STATE_LEFT and not unitExists) then
         button.unit_state = STATE_LEFT
+    elseif dead then
+        button.confirmedDead = true
+        button.unit_state = STATE_DEAD
     elseif stealth then
-        -- An explicit unseen update must replace stale death data.
-        button.unit_state = STATE_STEALTH
-    elseif UnitIsDeadOrGhost(unit) or (button.unit_state == STATE_DEAD and not UnitExists(unit)) then
+        button.unit_state = button.confirmedDead and STATE_DEAD or STATE_STEALTH
+    elseif isDead then
+        -- UnitIsDeadOrGhost can briefly retain stale data when an opponent
+        -- disappears. Display it, but only UNIT_DIED may persist it.
+        button.unit_state = STATE_DEAD
+    elseif button.confirmedDead and not unitExists then
         button.unit_state = STATE_DEAD
     else
+        if unitExists then
+            button.confirmedDead = nil
+        end
         button.unit_state = STATE_NORMAL
     end
 
