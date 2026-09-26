@@ -45,8 +45,10 @@ local STATE_DEAD = 1
 local STATE_STEALTH = 2
 local STATE_LEFT = 3
 
-local function ShouldPreserveStealth(button, unit)
-    return button and button.unit_state == STATE_STEALTH and not UnitExists(unit)
+local function ShouldPreserveStealth(button)
+    -- The arena "unseen" event is authoritative even while the unit token
+    -- briefly remains available with stale health/death data.
+    return button and button.unit_state == STATE_STEALTH
 end
 
 -- debugging output
@@ -620,7 +622,7 @@ function GladiusEx:UpdateArenaFrames()
         if numOpps >= i then
             self:UpdateUnit(unit)
             self:ShowUnit(unit)
-            self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
+            self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit]))
 
             -- test environment
             if self:IsTesting(unit) then
@@ -905,7 +907,7 @@ function GladiusEx:UNIT_NAME_UPDATE(event, unit)
 
     self:UpdateUnitGUID(event, unit)
     self:CheckArenaSize(unit)
-    self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
+    self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit]))
     self:RefreshUnit(unit)
 end
 
@@ -952,7 +954,7 @@ end
 function GladiusEx:UNIT_HEALTH(event, unit)
     if not self.buttons[unit] then return end
 
-    self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit], unit))
+    self:UpdateUnitState(unit, ShouldPreserveStealth(self.buttons[unit]))
 end
 
 function GladiusEx:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, sourceGUID, sourceName, sourceFlags, destGUID)
