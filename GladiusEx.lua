@@ -13,7 +13,7 @@ local max, abs, floor, ceil = math.max, math.abs, math.floor, math.ceil
 local InCombatLockdown = InCombatLockdown
 local GetNumArenaOpponents, GetNumPartyMembers = GetNumArenaOpponents, GetNumPartyMembers
 
-local UnitIsDeadOrGhost, UnitIsDeadOrGhost, UnitGUID, UnitExists, UnitClass, UnitAura  = UnitIsDeadOrGhost, UnitIsDeadOrGhost, UnitGUID, UnitExists, UnitClass, UnitAura
+local UnitIsDeadOrGhost, UnitHealth, UnitGUID, UnitExists, UnitClass, UnitAura = UnitIsDeadOrGhost, UnitHealth, UnitGUID, UnitExists, UnitClass, UnitAura
 local UnitChannelInfo, UnitCastingInfo, UnitPowerMax, UnitPowerType = UnitChannelInfo, UnitCastingInfo, UnitPowerMax, UnitPowerType
 
 local arena_units = {
@@ -261,6 +261,7 @@ function GladiusEx:OnInitialize()
     local spectate = self:GetModule("Spectate", true)
     
     UnitIsDeadOrGhost = spectate and spectate.UnitIsDeadOrGhost or UnitIsDeadOrGhost
+    UnitHealth = spectate and spectate.UnitHealth or UnitHealth
     UnitGUID = spectate and spectate.UnitGUID or UnitGUID
     UnitExists = spectate and spectate.UnitExists or UnitExists
     UnitClass = spectate and spectate.UnitClass or UnitClass
@@ -939,6 +940,7 @@ function GladiusEx:UpdateUnitGUID(event, unit)
                 button.class = nil
                 button.specID = nil
                 button.knownName = nil
+                button.confirmedDead = nil
                 self:SendMessage("GLADIUSEX_SPEC_UPDATE", unit)
             end
             button.guid = guid
@@ -982,27 +984,26 @@ function GladiusEx:UpdateUnitState(unit, stealth, left, dead)
     local previousState = button.unit_state
     local unitExists = UnitExists(unit)
     local isDead = unitExists and UnitIsDeadOrGhost(unit)
+    local isAlive = unitExists and not isDead and UnitHealth(unit) > 0
 
-    -- Only combat-log confirmation may preserve death after the unit token
-    -- disappears; UnitIsDeadOrGhost can briefly retain stale data.
+    -- Arena unit death data can be stale when an opponent enters stealth.
+    -- Only a combat-log death may mark an arena opponent dead.
     if left or (button.unit_state == STATE_LEFT and not unitExists) then
         button.unit_state = STATE_LEFT
     elseif dead then
         button.confirmedDead = true
         button.unit_state = STATE_DEAD
-    elseif stealth then
-        button.unit_state = button.confirmedDead and STATE_DEAD or STATE_STEALTH
-    elseif isDead then
-        -- UnitIsDeadOrGhost can briefly retain stale data when an opponent
-        -- disappears. Display it, but only UNIT_DIED may persist it.
+    elseif button.confirmedDead and not isAlive then
         button.unit_state = STATE_DEAD
-    elseif button.confirmedDead and not unitExists then
+    elseif stealth then
+        button.unit_state = STATE_STEALTH
+    elseif isDead and not self:IsArenaUnit(unit) then
         button.unit_state = STATE_DEAD
     else
-        if unitExists then
-            button.confirmedDead = nil
-        end
         button.unit_state = STATE_NORMAL
+    end
+    if isAlive and not dead then
+        button.confirmedDead = nil
     end
 
     if not button.soft_hidden then
@@ -1010,6 +1011,9 @@ function GladiusEx:UpdateUnitState(unit, stealth, left, dead)
     end
 
     if button.unit_state ~= previousState then
+        log("Unit state", unit, previousState, "->", button.unit_state,
+            "stealth", stealth, "left", left, "combatLogDeath", dead,
+            "unitExists", unitExists, "apiDead", isDead)
         self:SendMessage("GLADIUSEX_UNIT_STATE", unit)
     end
 end
@@ -1028,7 +1032,12 @@ end
 
 function GladiusEx:ShouldDisplayUnitAsDead(unit)
     local button = self.buttons[unit]
-    return button and (button.unit_state == STATE_DEAD or button.unit_state == STATE_LEFT)
+    return button and button.unit_state == STATE_DEAD
+end
+
+function GladiusEx:ShouldDisplayUnitAsLeft(unit)
+    local button = self.buttons[unit]
+    return button and button.unit_state == STATE_LEFT
 end
 
 function GladiusEx:ShouldDisplayUnitAsStealthed(unit)

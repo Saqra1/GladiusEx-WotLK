@@ -441,6 +441,7 @@ L["Left and right"] = true
 L["Left bottom"] = true
 L["Left top"] = true
 L["Left"] = true
+L["LEFT"] = true
 L["Lock frames"] = true
 L["Lock the frames to hide"] = true
 L["Lock the group to hide"] = true

@@ -980,13 +980,15 @@ function Tags:GetBuiltinTags()
                 return name
             elseif GladiusEx:ShouldDisplayUnitAsDead(unit) then
                 return L["DEAD"]
+            elseif GladiusEx:ShouldDisplayUnitAsLeft(unit) then
+                return L["LEFT"]
             elseif GladiusEx:ShouldDisplayUnitAsStealthed(unit) then
                 return L["STEALTH"]
             elseif not UnitExists(unit) then
                 return name
             elseif not UnitIsConnected(unit) then
                 return L["OFFLINE"]
-            elseif UnitIsDeadOrGhost(unit) then
+            elseif not GladiusEx:IsArenaUnit(unit) and UnitIsDeadOrGhost(unit) then
                 return L["DEAD"]
             else
                 return name

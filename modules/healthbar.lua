@@ -78,7 +78,7 @@ end
 
 function HealthBar:UpdateHealthEvent(event, unit)
     local health, maxHealth = UnitHealth(unit), UnitHealthMax(unit)
-    if GladiusEx:ShouldDisplayUnitAsDead(unit) then
+    if GladiusEx:ShouldDisplayUnitAsDead(unit) or GladiusEx:ShouldDisplayUnitAsLeft(unit) then
         health = 0
         if maxHealth == 0 then
             local lastMaxHealth = self.frame[unit] and self.frame[unit].maxHealth
