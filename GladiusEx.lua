@@ -373,6 +373,9 @@ function GladiusEx:OnEnable()
 
     self:RegisterEvent("UNIT_NAME_UPDATE")
     self:RegisterEvent("UNIT_HEALTH")
+    self:RegisterEvent("UNIT_AURA", "UNIT_HEALTH")
+    self:RegisterEvent("UNIT_FLAGS", "UNIT_HEALTH")
+    self:RegisterEvent("UNIT_DYNAMIC_FLAGS", "UNIT_HEALTH")
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self:RegisterEvent("UNIT_MAXHEALTH", "UNIT_HEALTH")
     self:RegisterEvent("PARTY_MEMBERS_CHANGED")
@@ -698,6 +701,7 @@ function GladiusEx:HideFrames()
         button.specID = nil
         button.unit_state = nil
         button.confirmedDead = nil
+        button.feignDeath = nil
         button.guid = nil
         button.knownName = nil
 
@@ -935,6 +939,7 @@ function GladiusEx:UpdateUnitGUID(event, unit)
                 button.specID = nil
                 button.knownName = nil
                 button.confirmedDead = nil
+                button.feignDeath = nil
                 button.unit_state = nil
                 self:SendMessage("GLADIUSEX_SPEC_UPDATE", unit)
             end
@@ -949,13 +954,19 @@ function GladiusEx:UpdateUnitGUID(event, unit)
 end
 
 function GladiusEx:UNIT_HEALTH(event, unit)
-    if not self.buttons[unit] then return end
+    local button = self.buttons[unit]
+    if not button then return end
 
+    local previousState = button.unit_state
     self:UpdateUnitState(unit)
+    if button.unit_state ~= previousState then
+        self:RefreshUnit(unit)
+    end
 end
 
-function GladiusEx:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, sourceGUID, sourceName, sourceFlags, destGUID)
-    if eventType ~= "UNIT_DIED" or not destGUID or not IsActiveBattlefieldArena() then return end
+function GladiusEx:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellID)
+    local feignEnded = eventType == "SPELL_AURA_REMOVED" and spellID == 5384
+    if (eventType ~= "UNIT_DIED" and not feignEnded) or not destGUID or not IsActiveBattlefieldArena() then return end
 
     local unit = self:GetUnitIdByGUID(destGUID)
     if not unit then
@@ -969,7 +980,7 @@ function GladiusEx:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, sour
     end
     if not self:IsArenaUnit(unit) then return end
 
-    self:UpdateUnitState(unit, "dead")
+    self:UpdateUnitState(unit, feignEnded and "feign-ended" or "dead")
     self:RefreshUnit(unit)
 end
 
@@ -983,20 +994,34 @@ function GladiusEx:UpdateUnitState(unit, reason)
 
     if self:IsArenaUnit(unit) then
         -- Enemy tokens can retain stale health/death data while disappearing.
-        -- UNIT_DIED confirms death; availability events must never imply LEFT
-        -- or undo a confirmed death. Only a living "seen" update (or a new
-        -- GUID/match) may clear it. Routine refreshes preserve the event state.
+        -- Feign Death can also produce UNIT_DIED. Remember its aura so a
+        -- living hunter can recover without another "seen" notification.
+        -- UnitIsFeignDeath only provides valid data for friendly units.
+        local isFeignDeath = unitExists and UnitAura(unit, self:SafeGetSpellName(5384))
+        if isFeignDeath then button.feignDeath = true end
+
         if reason == "dead" then
             button.confirmedDead = true
-        elseif reason == "seen" and isAlive then
-            button.confirmedDead = nil
+            -- A later real death must not inherit a previous Feign Death.
+            button.feignDeath = isFeignDeath and true or nil
+        elseif reason == "feign-ended" then
+            -- The aura may have been missed, or the death flag may lag removal.
+            button.feignDeath = true
         end
 
-        if button.confirmedDead then
+        local recovered = button.feignDeath and not isFeignDeath and isAlive
+            and UnitGUID(unit) == button.guid
+            and (not reason or reason == "feign-ended" or reason == "seen")
+        if (reason == "seen" and isAlive and not isFeignDeath) or recovered then
+            button.confirmedDead = nil
+            button.feignDeath = nil
+        end
+
+        if button.confirmedDead or isFeignDeath or (button.feignDeath and isDead) then
             button.unit_state = STATE_DEAD
         elseif reason == "unseen" or reason == "cleared" then
             button.unit_state = STATE_STEALTH
-        elseif reason == "seen" then
+        elseif reason == "seen" or recovered then
             button.unit_state = STATE_NORMAL
         else
             button.unit_state = previousState == STATE_STEALTH and STATE_STEALTH or STATE_NORMAL

@@ -13,7 +13,11 @@ UnitHealth = function(unit) return data(unit).health or 0 end
 UnitHealthMax = function(unit) return data(unit).maxHealth or 0 end
 UnitIsDeadOrGhost = function(unit) return data(unit).dead end
 UnitIsConnected = function(unit) return data(unit).exists end
-UnitClass = function() return "Rogue", "ROGUE" end
+UnitClass = function(unit) return "Class", data(unit).class or "ROGUE" end
+GetSpellInfo = function(spellID) return spellID == 5384 and "Feign Death" or nil end
+UnitAura = function(unit, name)
+    if name == "Feign Death" and data(unit).feignDeath then return name end
+end
 IsActiveBattlefieldArena = function() return arenaActive end
 InCombatLockdown = function() return inCombat end
 UNKNOWN = "Unknown"
@@ -111,6 +115,10 @@ local function died(guid)
     -- WoW 3.3.5a combat-log layout (no later hideCaster argument).
     addon:COMBAT_LOG_EVENT_UNFILTERED("COMBAT_LOG_EVENT_UNFILTERED", 1, "UNIT_DIED",
         "source-guid", "source", 0, guid or "arena1-guid", "arena1name", 0)
+end
+local function feignEnded(guid)
+    addon:COMBAT_LOG_EVENT_UNFILTERED("COMBAT_LOG_EVENT_UNFILTERED", 1, "SPELL_AURA_REMOVED",
+        "source-guid", "source", 0, guid or "arena1-guid", "arena1name", 0, 5384, "Feign Death", 1, "BUFF")
 end
 local function refresh()
     addon:UNIT_HEALTH("UNIT_HEALTH", "arena1")
@@ -234,6 +242,151 @@ test("API death flag alone cannot turn a rogue into DEAD", function()
     expect("STEALTH")
 end)
 
+for _, event in ipairs({"UNIT_AURA", "UNIT_FLAGS", "UNIT_DYNAMIC_FLAGS", "UNIT_HEALTH"}) do
+    test("Feign Death recovers on " .. event .. " without a seen update", function()
+        units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+        died()
+        expect("DEAD")
+        units.arena1.feignDeath, units.arena1.dead = nil, nil
+        addon:UNIT_HEALTH(event, "arena1")
+        expect("arena1name")
+        equal(addon.buttons.arena1.confirmedDead, nil)
+        equal(healthbar.frame.arena1.value, 100, "recovered health bar")
+        equal(addon.buttons.arena1.text, "arena1name", "recovered frame text")
+    end)
+end
+
+test("Feign Death aura alone recovers without a combat-log death", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    addon:UNIT_HEALTH("UNIT_AURA", "arena1")
+    expect("DEAD")
+    units.arena1.feignDeath, units.arena1.dead = nil, nil
+    addon:UNIT_HEALTH("UNIT_AURA", "arena1")
+    expect("arena1name")
+    equal(healthbar.frame.arena1.value, 100)
+end)
+
+test("Feign Death aura arriving after UNIT_DIED still recovers", function()
+    units.arena1.class, units.arena1.dead = "HUNTER", true
+    died()
+    units.arena1.feignDeath = true
+    addon:UNIT_HEALTH("UNIT_AURA", "arena1")
+    expect("DEAD")
+    units.arena1.feignDeath, units.arena1.dead = nil, nil
+    addon:UNIT_HEALTH("UNIT_AURA", "arena1")
+    expect("arena1name")
+end)
+
+test("Feign Death removal recovers a hunter even if its aura was missed", function()
+    units.arena1.class, units.arena1.dead = "HUNTER", true
+    died()
+    expect("DEAD")
+    units.arena1.dead = nil
+    feignEnded()
+    expect("arena1name")
+    equal(healthbar.frame.arena1.value, 100)
+end)
+
+test("Feign Death removal waits for the death flag to clear", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    units.arena1.feignDeath = nil
+    feignEnded()
+    expect("DEAD")
+    units.arena1.dead = nil
+    addon:UNIT_HEALTH("UNIT_DYNAMIC_FLAGS", "arena1")
+    expect("arena1name")
+    equal(healthbar.frame.arena1.value, 100)
+end)
+
+test("a hunter killed during Feign Death stays dead after aura removal", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    units.arena1.feignDeath, units.arena1.health = nil, 0
+    feignEnded()
+    addon:UNIT_HEALTH("UNIT_DYNAMIC_FLAGS", "arena1")
+    refresh()
+    expect("DEAD")
+    equal(healthbar.frame.arena1.value, 0)
+end)
+
+test("a real hunter death cannot be cleared by stale positive health", function()
+    units.arena1.class = "HUNTER"
+    died()
+    addon:UNIT_HEALTH("UNIT_FLAGS", "arena1")
+    addon:UNIT_HEALTH("UNIT_AURA", "arena1")
+    refresh()
+    expect("DEAD")
+end)
+
+test("Feign Death recovery does not carry over to a later real death", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    units.arena1.feignDeath, units.arena1.dead = nil, nil
+    feignEnded()
+    expect("arena1name")
+    died()
+    refresh()
+    expect("DEAD")
+end)
+
+test("Feign Death removal does not revive an unavailable enemy", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    units.arena1 = {}
+    availability("unseen")
+    addon:UpdateUnitGUID("UNIT_PORTRAIT_UPDATE", "arena1")
+    feignEnded()
+    refresh()
+    expect("DEAD")
+end)
+
+test("hunter returning after Feign Death removal recovers without seen", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    units.arena1.exists, units.arena1.feignDeath = nil, nil
+    availability("unseen")
+    feignEnded()
+    expect("DEAD")
+    units.arena1.exists, units.arena1.dead = true, nil
+    addon:UNIT_HEALTH("UNIT_FLAGS", "arena1")
+    expect("arena1name")
+    equal(healthbar.frame.arena1.value, 100)
+end)
+
+test("inverse health bar restores after Feign Death", function()
+    healthbar.db.arena1.healthBarInverse = true
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    equal(healthbar.frame.arena1.value, 100)
+    units.arena1.feignDeath, units.arena1.dead = nil, nil
+    addon:UNIT_HEALTH("UNIT_AURA", "arena1")
+    expect("arena1name")
+    equal(healthbar.frame.arena1.value, 0)
+end)
+
+test("unrelated aura removals cannot clear a real death", function()
+    died()
+    feignEnded("other-guid")
+    addon:COMBAT_LOG_EVENT_UNFILTERED("COMBAT_LOG_EVENT_UNFILTERED", 1, "SPELL_AURA_REMOVED",
+        "source-guid", "source", 0, "arena1-guid", "arena1name", 0, 642, "Divine Shield", 2, "BUFF")
+    expect("DEAD")
+    equal(addon.buttons.arena1.feignDeath, nil)
+end)
+
+test("new GUID cannot inherit Feign Death recovery", function()
+    units.arena1.class, units.arena1.feignDeath, units.arena1.dead = "HUNTER", true, true
+    died()
+    units.arena1.guid, units.arena1.name = "new-guid", "New opponent"
+    units.arena1.feignDeath, units.arena1.dead = nil, nil
+    addon:UNIT_NAME_UPDATE("UNIT_NAME_UPDATE", "arena1")
+    expect("New opponent")
+    equal(addon.buttons.arena1.feignDeath, nil)
+    died("new-guid")
+    refresh()
+    expect("DEAD")
+end)
+
 test("unknown opponents keep unknown until identified", function()
     reset(false)
     for _, reason in ipairs({"unseen", "destroyed", "cleared"}) do
@@ -288,12 +441,15 @@ test("party death and departure behavior remains independent", function()
 end)
 
 test("leaving an arena clears cached enemy state", function()
+    units.arena1.feignDeath, units.arena1.dead = true, true
     died()
     addon:HideFrames()
     equal(addon.buttons.arena1.confirmedDead, nil)
+    equal(addon.buttons.arena1.feignDeath, nil)
     equal(addon.buttons.arena1.guid, nil)
     equal(addon.buttons.arena1.knownName, nil)
     equal(addon.buttons.arena1.unit_state, nil)
+    units.arena1.feignDeath, units.arena1.dead = nil, nil
     availability("seen")
     expect("arena1name")
 end)
