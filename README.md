@@ -24,6 +24,30 @@ The "Incoming" Absorb/Heal portion of the healthbar module has been removed as t
 
 The "Cooldowns" module is only in beta mode. It works, but some abilities might be missing / having an incorrect spell ID (thus not working) / have an incorrect CD / be missing some conditional. Feel free to [report](https://github.com/ManneN1/LibCooldownTracker-1.0-3.3.5/issues) specific improvements that can be done, or create a pull request in [LibCooldownTracker-1.0 (3.3.5)](https://github.com/ManneN1/LibCooldownTracker-1.0-3.3.5/pulls).
 
+# Embedded library maintenance
+
+LibDualSpec-1.0 and AceDB-3.0 are tracked directly in this repository. The 3.3.5a
+LibDualSpec fork uses revision 100 so LibStub selects it over older embedded copies.
+Keep the upstream copyright and license header when updating it; distribute it
+as part of GladiusEx.
+
+LibDualSpec preserves numbered primary/secondary profile assignments and migrates
+legacy `profile`/`specGroup` or `talentGroup` settings. Missing or malformed names
+fall back to the current profile. `GetDualSpecProfile(group)` and
+`SetDualSpecProfile(name, group)` accept group 1 or 2; omitting it retains the
+older API's alternate-profile behavior. Disabling automatic switching preserves
+both assignments.
+
+Run regression checks from the addon directory with Lua 5.1:
+
+```sh
+lua tests/dual_spec.lua
+lua tests/enemy_status.lua
+```
+
+The dual-spec test accepts optional LibDualSpec and AceDB file paths to check
+other embedded versions against the same cases.
+
 # Screenshots
 
 <img width="532" height="388" alt="image" src="https://github.com/user-attachments/assets/7aa40e12-895e-40c3-8aa0-a9a698a22f0c" />

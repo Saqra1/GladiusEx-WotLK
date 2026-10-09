@@ -31,7 +31,9 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
-local MAJOR, MINOR = "LibDualSpec-1.0", 12
+-- Revision 100 is the GladiusEx-WotLK maintained fork for client 3.3.5a.
+-- It must supersede older copies embedded in other addons through LibStub.
+local MAJOR, MINOR = "LibDualSpec-1.0", 100
 assert(LibStub, MAJOR.." requires LibStub")
 local lib, minor = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
@@ -46,11 +48,13 @@ lib.registry = lib.registry or {}
 lib.options = lib.options or {}
 lib.mixin = lib.mixin or {}
 
--- Rename .talent* to .spec*
-if minor and minor < 11 then
-	lib.specLoaded = lib.talentsLoaded
-	lib.specGroup = lib.talentGroup
+if minor then
+	-- Existing databases and option plugins share these tables with the old copy.
+	-- Replace its event handler and options, then wait for reliable talent data.
+	lib.eventFrame:UnregisterAllEvents()
+	lib.specLoaded, lib.specGroup = nil, nil
 	lib.talentsLoaded, lib.talentGroup = nil, nil
+	for key in pairs(lib.options) do lib.options[key] = nil end
 end
 
 -- ----------------------------------------------------------------------------
@@ -66,11 +70,49 @@ local AceDB3 = LibStub('AceDB-3.0', true)
 local AceDBOptions3 = LibStub('AceDBOptions-3.0', true)
 
 -- ----------------------------------------------------------------------------
--- MoP compatibility
+-- WoW 3.3.5a talent API
 -- ----------------------------------------------------------------------------
 
-local GetActiveSpecGroup = GetActiveSpecGroup or GetActiveTalentGroup
-local GetNumSpecGroups = GetNumSpecGroups or GetNumTalentGroups
+local GetActiveSpecGroup = GetActiveTalentGroup
+local GetNumSpecGroups = GetNumTalentGroups
+
+local function IsSpecGroup(group)
+	return group == 1 or group == 2
+end
+
+local function IsProfileName(name)
+	return type(name) == "string"
+end
+
+-- Keep numbered assignments intact; migrate the old current/alternate format.
+local function PrepareProfiles(target)
+	local char = registry[target].db.char
+	local currentProfile = target:GetCurrentProfile()
+	if IsProfileName(char.profile) then
+		local previousGroup = IsSpecGroup(char.specGroup) and char.specGroup
+			or IsSpecGroup(char.talentGroup) and char.talentGroup or lib.specGroup
+		if not IsProfileName(char[previousGroup]) then
+			char[previousGroup] = currentProfile
+		end
+		if not IsProfileName(char[3 - previousGroup]) then
+			char[3 - previousGroup] = char.profile
+		end
+	end
+	for group = 1, 2 do
+		if not IsProfileName(char[group]) then char[group] = currentProfile end
+	end
+	char.profile, char.talentGroup = nil, nil
+	local pendingProfile = registry[target].pendingProfile
+	if pendingProfile then
+		local alternateGroup = 3 - lib.specGroup
+		local overrides = registry[target].pendingOverrides
+		if not overrides or not overrides[alternateGroup] then
+			char[alternateGroup] = pendingProfile
+		end
+		registry[target].pendingProfile, registry[target].pendingOverrides = nil, nil
+	end
+	return char
+end
 
 -- ----------------------------------------------------------------------------
 -- Localization
@@ -148,51 +190,76 @@ end
 -- @param enabled (boolean) true to enable dual spec feature, false to disable it.
 -- @name enhancedDB:SetDualSpecEnabled
 function mixin:SetDualSpecEnabled(enabled)
-	local db = registry[self].db
-	if enabled and not db.char.specGroup then
-		db.char.specGroup = lib.specGroup
-		db.char.profile = self:GetCurrentProfile()
-		db.char.enabled = true
-	else
-		db.char.enabled = enabled
-		self:CheckDualSpecState()
-	end
+	registry[self].db.char.enabled = not not enabled
+	self:CheckDualSpecState()
 end
 
---- Get the alternate profile name.
+--- Get a profile assignment, or the alternate profile when group is omitted.
 -- Defaults to the current profile.
+-- @param group (number, optional) 1 for primary, 2 for secondary talents.
 -- @return (string) Alternate profile name.
 -- @name enhancedDB:GetDualSpecProfile
-function mixin:GetDualSpecProfile()
-	return registry[self].db.char.profile or self:GetCurrentProfile()
+function mixin:GetDualSpecProfile(group)
+	local data = registry[self]
+	local char = data.db.char
+	if group == nil then
+		if data.pendingProfile then return data.pendingProfile end
+		if not lib.specLoaded then
+			return IsProfileName(char.profile) and char.profile or self:GetCurrentProfile()
+		end
+		group = 3 - lib.specGroup
+	end
+	local name = IsSpecGroup(group) and char[group]
+	return IsProfileName(name) and name or self:GetCurrentProfile()
 end
 
---- Set the alternate profile name.
--- No validation are done to ensure the profile is valid.
+--- Set a profile assignment, or the alternate profile when group is omitted.
+-- The named profile need not already exist.
 -- @param profileName (string) the profile name to use.
+-- @param group (number, optional) 1 for primary, 2 for secondary talents.
 -- @name enhancedDB:SetDualSpecProfile
-function mixin:SetDualSpecProfile(profileName)
-	registry[self].db.char.profile = profileName
+function mixin:SetDualSpecProfile(profileName, group)
+	if not IsProfileName(profileName) then
+		error("Usage: SetDualSpecProfile(profileName, group): profileName must be a string.", 2)
+	elseif group ~= nil and not IsSpecGroup(group) then
+		error("Usage: SetDualSpecProfile(profileName, group): group must be 1 or 2.", 2)
+	end
+	if group == nil and not lib.specLoaded then
+		registry[self].pendingProfile = profileName
+		registry[self].pendingOverrides = nil
+		return
+	end
+	if not lib.specLoaded and registry[self].pendingProfile then
+		local data = registry[self]
+		data.pendingOverrides = data.pendingOverrides or {}
+		data.pendingOverrides[group] = true
+	end
+	if lib.specLoaded then PrepareProfiles(self) end
+	group = group or (3 - lib.specGroup)
+	registry[self].db.char[group] = profileName
+	self:CheckDualSpecState()
 end
 
---- Check if a profile swap should occur.
--- Do nothing if the dual spec feature is disabled. In the other
--- case, if the internally stored talent spec is different from the
--- actual active talent spec, the database swaps to the alternate profile.
+--- Apply the active talent group's profile when automatic switching is enabled.
 -- There is normally no reason to call this method directly as LibDualSpec
 -- takes care of calling it at appropriate times.
 -- @name enhancedDB:CheckDualSpecState
 function mixin:CheckDualSpecState()
-	local db = registry[self].db
-	if lib.specLoaded and db.char.enabled and db.char.specGroup ~= lib.specGroup then
-		local currentProfile = self:GetCurrentProfile()
-		local newProfile = db.char.profile
-		db.char.specGroup = lib.specGroup
-		if newProfile ~= currentProfile then
-			db.char.profile = currentProfile
-			self:SetProfile(newProfile)
-		end
+	local char = registry[self].db.char
+	if not lib.specLoaded or not IsSpecGroup(lib.specGroup) then return end
+	if not char.enabled then
+		-- Resolve an unindexed selection against the first reliable talent group,
+		-- even when automatic switching has not been enabled yet.
+		if registry[self].pendingProfile then PrepareProfiles(self) end
+		return
 	end
+	local currentProfile = self:GetCurrentProfile()
+	char = PrepareProfiles(self)
+	local newProfile = char[lib.specGroup]
+	-- Set this before SetProfile fires callbacks, so manual profile changes belong
+	-- to the active specialization rather than the one we just left.
+	char.specGroup = lib.specGroup
+	if newProfile ~= currentProfile then self:SetProfile(newProfile) end
 end
 
 -- ----------------------------------------------------------------------------
@@ -205,16 +272,34 @@ local function EmbedMixin(target)
 	end
 end
 
--- Upgrade existing mixins
-for target in pairs(registry) do
-	EmbedMixin(target)
+function lib:OnProfileChanged(event, target)
+	local char = registry[target].db.char
+	if char.enabled and lib.specLoaded and IsSpecGroup(lib.specGroup) then
+		char[lib.specGroup] = target:GetCurrentProfile()
+	end
+end
+
+function lib:OnProfileDeleted(event, target, profileName)
+	local char = registry[target].db.char
+	for group = 1, 2 do
+		if char[group] == profileName then char[group] = target:GetCurrentProfile() end
+	end
+	if char.profile == profileName then char.profile = nil end
+	if registry[target].pendingProfile == profileName then
+		registry[target].pendingProfile = target:GetCurrentProfile()
+	end
 end
 
 -- Actually enhance the database
 -- This is used on first initialization and everytime the database is reset using :ResetDB
 function lib:_EnhanceDatabase(event, target)
+	if event == "OnDatabaseReset" then
+		registry[target].pendingProfile, registry[target].pendingOverrides = nil, nil
+	end
 	registry[target].db = target:GetNamespace(MAJOR, true) or target:RegisterNamespace(MAJOR)
 	EmbedMixin(target)
+	target.RegisterCallback(lib, "OnProfileChanged")
+	target.RegisterCallback(lib, "OnProfileDeleted")
 	target:CheckDualSpecState()
 end
 
@@ -238,6 +323,12 @@ function lib:EnhanceDatabase(target, name)
 	end
 	registry[target] = { name = name }
 	lib:_EnhanceDatabase("EnhanceDatabase", target)
+	target.RegisterCallback(lib, "OnDatabaseReset", "_EnhanceDatabase")
+end
+
+-- Upgrade methods and callbacks on databases registered by an earlier copy.
+for target in pairs(registry) do
+	lib:_EnhanceDatabase("LibraryUpgrade", target)
 	target.RegisterCallback(lib, "OnDatabaseReset", "_EnhanceDatabase")
 end
 
@@ -340,11 +431,12 @@ lib.eventFrame:SetScript('OnEvent', function(_, event)
 	if event == 'ADDON_LOADED' and not IsLoggedIn() then
 		return
 	end
+	local newSpecGroup = GetActiveSpecGroup()
+	if not IsSpecGroup(newSpecGroup) then return end
 	if not lib.specLoaded then
 		lib.specLoaded = true
 		lib.eventFrame:UnregisterEvent('ADDON_LOADED')
 	end
-	local newSpecGroup = GetActiveSpecGroup()
 	if lib.specGroup ~= newSpecGroup then
 		lib.specGroup = newSpecGroup
 		for target in pairs(registry) do
@@ -353,4 +445,7 @@ lib.eventFrame:SetScript('OnEvent', function(_, event)
 	end
 end)
 
-
+-- Loading the library after login does not require another talent event.
+if IsLoggedIn() then
+	lib.eventFrame:GetScript('OnEvent')(lib.eventFrame, 'ADDON_LOADED')
+end
