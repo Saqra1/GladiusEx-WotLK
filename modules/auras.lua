@@ -114,6 +114,20 @@ function Auras:GetFrames(unit)
     return frames
 end
 
+function Auras:GetPositioningFrames(unit)
+    local frames = {}
+    local function include(parent)
+        if parent and parent:IsShown() then
+            for _, icon in ipairs(parent) do
+                if icon:IsShown() then frames[#frames + 1] = icon end
+            end
+        end
+    end
+    if self.db[unit].aurasBuffs then include(self.buffFrame[unit]) end
+    if self.db[unit].aurasDebuffs then include(self.debuffFrame[unit]) end
+    return frames
+end
+
 function Auras:GetModuleAttachPoints(unit)
     return {
         ["Buffs"] = L["Buffs"],

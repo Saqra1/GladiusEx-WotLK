@@ -1,5 +1,11 @@
 ﻿local L = LibStub("AceLocale-3.0"):NewLocale("GladiusEx", "enUS", true)
 
+-- Group positioning editor
+L["GladiusEx - %s"] = true
+L["Health + class icon top-left. Enter to apply."] = true
+L["Done"] = true
+L["Unlock to drag groups or edit their X/Y coordinates."] = true
+
 -- Cooldowns module
 L["cat:pvp_trinket"] = "PvP Trinket"
 L["cat:mass_dispel"] = "Mass Dispel"

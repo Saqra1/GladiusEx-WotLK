@@ -78,6 +78,17 @@ function DRTracker:GetFrames()
     return nil
 end
 
+function DRTracker:GetPositioningFrames(unit)
+    local frames = {}
+    local parent = self.frame[unit]
+    if parent and parent:IsShown() then
+        for _, icon in pairs(parent.tracker or {}) do
+            if icon:IsShown() then frames[#frames + 1] = icon end
+        end
+    end
+    return frames
+end
+
 function DRTracker:GetModuleAttachPoints()
     return {
         ["DRTracker"] = L["DRTracker"],

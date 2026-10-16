@@ -101,6 +101,8 @@ SlashCmdList["GLADIUSEX"] = function(msg)
         GladiusEx:SetTesting(test)
     elseif msg == "" or msg == "options" or msg == "config" or msg == "ui" then
         GladiusEx:ShowOptionsDialog()
+    elseif msg == "edit" or msg == "move" then
+        GladiusEx:SetPositioningMode(GladiusEx.db.base.locked)
     elseif msg == "hide" then
         -- hide buttons
         GladiusEx:HideFrames()
@@ -435,7 +437,8 @@ function GladiusEx:SetupOptions()
                             locked = {
                                 type = "toggle",
                                 name = L["Lock frames"],
-                                desc = L["Toggle if the frames can be moved"],
+                                desc = L["Unlock to drag groups or edit their X/Y coordinates."],
+                                set = function(info, value) GladiusEx:SetPositioningMode(not value) end,
                                 order = 1,
                             },
                             showParty = {

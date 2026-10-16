@@ -235,6 +235,25 @@ function Cooldowns:GetFrames(unit)
 	return frames
 end
 
+-- Exclude empty reserved slots from the positioning outline.
+function Cooldowns:GetPositioningFrames(unit)
+	local frames = {}
+	for group = 1, self:GetNumGroups(unit) do
+		local db = self:GetGroupDB(unit, group)
+		local frame = self:GetGroupState(unit, group).frame
+		if not db.cooldownsDetached and frame and frame:IsShown() then
+			if db.cooldownsBackground.a > 0 then
+				tinsert(frames, frame)
+			else
+				for _, icon in ipairs(frame) do
+					if icon:IsShown() then tinsert(frames, icon) end
+				end
+			end
+		end
+	end
+	return frames
+end
+
 function Cooldowns:OnProfileChanged()
 	self.super.OnProfileChanged(self)
 	self:SpellSortingChanged()

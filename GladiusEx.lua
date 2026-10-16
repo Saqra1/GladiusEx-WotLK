@@ -380,6 +380,7 @@ function GladiusEx:OnEnable()
     self:RegisterEvent("UNIT_MAXHEALTH", "UNIT_HEALTH")
     self:RegisterEvent("PARTY_MEMBERS_CHANGED")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
+    self:RegisterEvent("PLAYER_REGEN_DISABLED")
     self:RegisterEvent("UNIT_PET", "UpdateUnitGUID")
     self:RegisterEvent("UNIT_PORTRAIT_UPDATE", "UpdateUnitGUID")
 
@@ -401,6 +402,7 @@ function GladiusEx:CheckFirstRun()
         self:Print(L["First run has been detected, displaying test frame"])
         self:Print(L["Valid slash commands are:"])
         self:Print("/gex ui")
+        self:Print("/gex edit")
         self:Print("/gex test 2-5")
         self:Print("/gex hide")
         self:Print("/gex reset")
@@ -422,6 +424,11 @@ function GladiusEx:OnDisable()
 end
 
 function GladiusEx:OnProfileChanged(event, database, newProfileKey)
+    if self.positioning_panel then self:ClearPositioningSelection() end
+    for _, group in ipairs({"arena", "party"}) do
+        local anchor = self:GetAnchorFrames(group)
+        if anchor then anchor.position_db, anchor.position_before_layout = nil, nil end
+    end
     -- update frame and modules on profile change
     wipe(self.db)
 
@@ -437,6 +444,7 @@ function GladiusEx:OnProfileChanged(event, database, newProfileKey)
 end
 
 function GladiusEx:SetTesting(count)
+    self.positioning_preview = nil
     self.test = count
     self:UpdateFrames()
 
@@ -601,6 +609,7 @@ function GladiusEx:UpdatePartyFrames()
         self:HideUnit("player")
     end
 
+    self:UpdateAnchorHandle("party")
     self:UpdateBackground("party")
 end
 
@@ -633,6 +642,7 @@ function GladiusEx:UpdateArenaFrames()
         end
     end
 
+    self:UpdateAnchorHandle("arena")
     self:UpdateBackground("arena")
 end
 
@@ -664,7 +674,7 @@ function GladiusEx:ShowFrames()
             local anchor, background = self:GetAnchorFrames(anchor_type)
             background:Show()
 
-            if not self.db.base.locked then
+            if not self.db.base.locked and not InCombatLockdown() then
                 anchor:Show()
             end
         end
@@ -690,6 +700,7 @@ function GladiusEx:ShowFrames()
 end
 
 function GladiusEx:HideFrames()
+    if self.positioning_panel then self:ClearPositioningSelection() end
     if InCombatLockdown() then
         self:QueueUpdate()
     end
@@ -899,6 +910,19 @@ function GladiusEx:PLAYER_REGEN_ENABLED()
     if self:IsUpdatePending() then
         self:UpdateFrames()
     end
+end
+
+function GladiusEx:PLAYER_REGEN_DISABLED()
+    if self.positioning_panel then self:ClearPositioningSelection() end
+    for _, group in ipairs({"arena", "party"}) do
+        local anchor = self:GetAnchorFrames(group)
+        if anchor and anchor.editor then
+            self:StopAnchorMoving(group)
+            anchor.editor:Hide()
+            anchor:Hide()
+        end
+    end
+    self:QueueUpdate()
 end
 
 function GladiusEx:UNIT_NAME_UPDATE(event, unit)
@@ -1177,7 +1201,6 @@ function GladiusEx:CreateUnit(unit)
     button:RegisterForDrag("LeftButton")
 
     local drag_anchor_type = self:GetUnitAnchorType(unit)
-    local drag_anchor_frame = self:GetUnitAnchor(unit)
 
     button:SetScript("OnMouseDown", function(f, button)
         if button == "RightButton" then
@@ -1187,18 +1210,19 @@ function GladiusEx:CreateUnit(unit)
 
     button:SetScript("OnDragStart", function(f)
         if not InCombatLockdown() and not self.db.base.locked then
-            local f = self.db[unit].groupButtons and drag_anchor_frame or f
-            f:StartMoving()
+            if self.db[unit].groupButtons then
+                self:StartAnchorMoving(drag_anchor_type)
+            else
+                f:StartMoving()
+            end
         end
     end)
 
     button:SetScript("OnDragStop", function(f)
-        local f = self.db[unit].groupButtons and drag_anchor_frame or f
-        f:StopMovingOrSizing()
-
         if self.db[unit].groupButtons then
-            self:SaveAnchorPosition(drag_anchor_type)
+            self:StopAnchorMoving(drag_anchor_type)
         else
+            f:StopMovingOrSizing()
             local scale = f:GetEffectiveScale()
             self.db[unit].x[unit] = f:GetLeft() * scale
             self.db[unit].y[unit] = f:GetTop() * scale
@@ -1228,10 +1252,13 @@ function GladiusEx:SaveAnchorPosition(anchor_type)
     local scale = anchor:GetEffectiveScale() or 1
     self.db[anchor_type].x["anchor_" .. anchor_type] = (anchor:GetLeft() or 0) * scale
     self.db[anchor_type].y["anchor_" .. anchor_type] = (anchor:GetTop() or 0) * scale
-    -- save all unit positions so that they stay at the same place if the buttons are ungrouped
+    -- Preserve each unit's own scale and leave the other group's settings alone.
     for unit, button in pairs(self.buttons) do
-        self.db[unit].x[unit] = (button:GetLeft() or 0) * scale
-        self.db[unit].y[unit] = (button:GetTop() or 0) * scale
+        if self:GetUnitAnchorType(unit) == anchor_type then
+            local unit_scale = button:GetEffectiveScale()
+            self.db[unit].x[unit] = (button:GetLeft() or 0) * unit_scale
+            self.db[unit].y[unit] = (button:GetTop() or 0) * unit_scale
+        end
     end
 end
 
@@ -1241,50 +1268,9 @@ function GladiusEx:CreateAnchor(anchor_type)
     background:SetBackdrop({ bgFile = [[Interface\Buttons\WHITE8X8]], tile = true, tileSize = 8 })
     background:SetFrameStrata("BACKGROUND")
 
-    -- anchor
+    -- Keep the saved layout origin independent of the positioning overlay.
     local anchor = CreateFrame("Frame", "GladiusExButtonAnchor" .. anchor_type, anchor_type == "party" and self.party_parent or self.arena_parent)
-    anchor:SetScript("OnMouseDown", function(f, button)
-        if button == "LeftButton" then
-            if IsShiftKeyDown() then
-                -- center horizontally
-                anchor:ClearAllPoints()
-                anchor:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, f:GetBottom())
-                self:SaveAnchorPosition(anchor_type)
-            elseif IsAltKeyDown() then
-                -- center vertically
-                anchor:ClearAllPoints()
-                anchor:SetPoint("LEFT", UIParent, "LEFT", f:GetLeft(), 0)
-                self:SaveAnchorPosition(anchor_type)
-            elseif IsControlKeyDown() then
-                local other_anchor = self:GetAnchorFrames(anchor_type == "party" and "arena" or "party")
-                if self.db[anchor_type].growDirection == "UP" or self.db[anchor_type].growDirection == "DOWN" or self.db[anchor_type].growDirection == "VCENTER" then
-                    -- set same y as the other anchor
-                    anchor:ClearAllPoints()
-                    anchor:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", anchor:GetLeft(), other_anchor:GetTop())
-                else
-                    -- set same x as the other anchor
-                    anchor:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", other_anchor:GetLeft(), anchor:GetTop())
-                end
-                self:SaveAnchorPosition(anchor_type)
-            end
-        elseif button == "RightButton" then
-            self:ShowOptionsDialog()
-        end
-    end)
-
-    anchor:SetScript("OnDragStart", function(f)
-        if not InCombatLockdown() and not self.db.base.locked then
-            anchor:StartMoving()
-        end
-    end)
-
-    anchor:SetScript("OnDragStop", function(f)
-        anchor:StopMovingOrSizing()
-        self:SaveAnchorPosition(anchor_type)
-    end)
-
-    anchor.text = anchor:CreateFontString("GladiusExButtonAnchorText", "OVERLAY")
-    anchor.text2 = anchor:CreateFontString("GladiusExButtonAnchorText2", "OVERLAY")
+    anchor.editor = self:CreatePositioningOverlay(anchor_type, anchor)
 
     background.background_type = anchor_type
     anchor.anchor_type = anchor_type
@@ -1591,6 +1577,8 @@ end
 
 function GladiusEx:UpdateAnchor(anchor_type)
     local anchor, background = self:GetAnchorFrames(anchor_type)
+    self:StopAnchorMoving(anchor_type)
+    self:CaptureGroupPosition(anchor_type)
 
     -- anchor
     anchor:ClearAllPoints()
@@ -1607,39 +1595,22 @@ function GladiusEx:UpdateAnchor(anchor_type)
         anchor:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.db[anchor_type].x["anchor_" .. anchor.anchor_type] / eff, self.db[anchor_type].y["anchor_" .. anchor.anchor_type] / eff)
     end
 
-    anchor:SetBackdrop({
-        edgeFile = [[Interface\Buttons\WHITE8X8]], edgeSize = self:AdjustPixels(anchor, max(1, floor(self.db[anchor_type].frameScale + 0.5))),
-        bgFile = [[Interface\Buttons\WHITE8X8]], tile = true, tileSize = 8,
-    })
-    anchor:SetBackdropColor(0, 0, 0, 1)
-    anchor:SetBackdropBorderColor(1, 1, 1, 1)
-    anchor:SetFrameLevel(200)
-    anchor:SetFrameStrata("MEDIUM")
-
     anchor:SetClampedToScreen(true)
-    anchor:EnableMouse(true)
+    anchor:EnableMouse(false)
     anchor:SetMovable(true)
-    anchor:RegisterForDrag("LeftButton")
-
-    -- anchor texts
-    anchor.text:SetPoint("TOP", anchor, "TOP", 0, -7)
-    anchor.text:SetFont(LSM:Fetch(LSM.MediaType.FONT, self.db.base.globalFont), 11, self.db.base.globalFontOutline)
-    anchor.text:SetTextColor(1, 1, 1, 1)
-    anchor.text:SetShadowOffset(1, -1)
-    anchor.text:SetShadowColor(0, 0, 0, 1)
-    anchor.text:SetText(anchor.anchor_type == "party" and L["GladiusEx Party Anchor - click to move"] or L["GladiusEx Enemy Anchor - click to move"])
-
-    anchor.text2:SetPoint("BOTTOM", anchor, "BOTTOM", 0, 7)
-    anchor.text2:SetFont(LSM:Fetch(LSM.MediaType.FONT, self.db.base.globalFont), 11, self.db.base.globalFontOutline)
-    anchor.text2:SetTextColor(1, 1, 1, 1)
-    anchor.text2:SetShadowOffset(1, -1)
-    anchor.text2:SetShadowColor(0, 0, 0, 1)
-    anchor.text2:SetText(L["Lock the frames to hide"])
 
     if self.db[anchor_type].groupButtons and not self.db.base.locked then
         anchor:Show()
     else
         anchor:Hide()
+    end
+end
+
+function GladiusEx:UpdateAnchorHandle(anchor_type)
+    local anchor = self:GetAnchorFrames(anchor_type)
+    if anchor and anchor.editor then
+        self:RestoreGroupPosition(anchor_type)
+        self:UpdatePositioningOverlay(anchor_type)
     end
 end
 
