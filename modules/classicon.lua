@@ -796,7 +796,9 @@ function ClassIcon:GetOptions(unit)
 
     -- setup auras
     for aura, priority in pairs(self.db[unit].classIconAuras) do
-        options.auraList.args[aura] = self:SetupAuraOptions(options, unit, aura)
+        if priority then
+            options.auraList.args[aura] = self:SetupAuraOptions(options, unit, aura)
+        end
     end
 
     return options
@@ -806,13 +808,14 @@ function ClassIcon:SetupAuraOptions(options, unit, aura)
     local function setAura(info, value)
         if (info[#(info)] == "name") then
             local old_name = info[#(info) - 1]
+            if old_name == value then return end
 
             -- create new aura
             self.db[unit].classIconAuras[value] = self.db[unit].classIconAuras[old_name]
             options.auraList.args[value] = self:SetupAuraOptions(options, unit, value)
 
-            -- delete old aura
-            self.db[unit].classIconAuras[old_name] = nil
+            -- Keep an explicit override so AceDB does not restore the default.
+            self.db[unit].classIconAuras[old_name] = false
             options.auraList.args[old_name] = nil
         else
             self.db[unit].classIconAuras[info[#(info) - 1]] = value
@@ -857,7 +860,8 @@ function ClassIcon:SetupAuraOptions(options, unit, aura)
                 name = L["Delete"],
                 func = function(info)
                     local aura = info[#(info) - 1]
-                    self.db[unit].classIconAuras[aura] = nil
+                    -- nil would allow AceDB to restore a default aura on reload.
+                    self.db[unit].classIconAuras[aura] = false
                     options.auraList.args[aura] = nil
                     GladiusEx:UpdateFrames()
                 end,
