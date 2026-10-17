@@ -1,0 +1,40 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<Script file="libs\LibStub\LibStub.lua"/>
+	<Include file="libs\CallbackHandler-1.0\Callbackhandler-1.0.xml"/>
+    <Include file="libs\AceTimer-3.0\AceTimer-3.0.xml"/>
+
+	<Include file="libs\LibSpecDetection-1.0\LibSpecDetection-1.0.xml"/>
+
+	<Script file="cooldowns_spelldata.lua"/>
+
+	<Script file="cooldowns_tbc_deathknight.lua"/>
+	<Script file="cooldowns_tbc_druid.lua"/>
+	<Script file="cooldowns_tbc_hunter.lua"/>
+	<Script file="cooldowns_tbc_mage.lua"/>
+	<Script file="cooldowns_tbc_monk.lua"/>
+	<Script file="cooldowns_tbc_paladin.lua"/>
+	<Script file="cooldowns_tbc_priest.lua"/>
+	<Script file="cooldowns_tbc_rogue.lua"/>
+	<Script file="cooldowns_tbc_shaman.lua"/>
+	<Script file="cooldowns_tbc_warlock.lua"/>
+	<Script file="cooldowns_tbc_warrior.lua"/>
+	<Script file="cooldowns_tbc_racials.lua"/>
+	<Script file="cooldowns_tbc_items.lua"/>
+	
+	<Script file="cooldowns_wotlk_deathknight.lua"/>
+	<Script file="cooldowns_wotlk_druid.lua"/>
+	<Script file="cooldowns_wotlk_hunter.lua"/>
+	<Script file="cooldowns_wotlk_mage.lua"/>
+	<Script file="cooldowns_wotlk_monk.lua"/>
+	<Script file="cooldowns_wotlk_paladin.lua"/>
+	<Script file="cooldowns_wotlk_priest.lua"/>
+	<Script file="cooldowns_wotlk_rogue.lua"/>
+	<Script file="cooldowns_wotlk_shaman.lua"/>
+	<Script file="cooldowns_wotlk_warlock.lua"/>
+	<Script file="cooldowns_wotlk_warrior.lua"/>
+	<Script file="cooldowns_wotlk_racials.lua"/>
+	<Script file="cooldowns_wotlk_items.lua"/>
+
+	<Script file="library.lua"/>
+</Ui>

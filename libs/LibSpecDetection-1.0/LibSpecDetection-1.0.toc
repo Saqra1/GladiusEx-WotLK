@@ -1,0 +1,5 @@
+## Interface: 30300
+## Title: LibSpecDetection-1.0
+## Notes: Unit Specialization Detection Library
+
+LibSpecDetection-1.0.xml

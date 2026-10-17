@@ -1,0 +1,25 @@
+<!-- LibSpecDetection-1.0.xml -->
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <!-- Load dependencies -->
+    <Script file="Libs\LibStub\LibStub.lua"/>
+    <Include file="Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml"/>
+	
+	<!-- Supporting multiple expansions at once -->
+	<Include file="Libs\AceTimer-3.0_mop\AceTimer-3.0.xml"/>
+	<Include file="Libs\AceTimer-3.0_cata\AceTimer-3.0.xml"/>
+	<Include file="Libs\AceTimer-3.0_wotlk\AceTimer-3.0.xml"/>
+
+	<!-- Supporting multiple expansions at once -->
+	<Include file="Libs\LibGroupInSpecT-1.0\lib.xml"/>
+	<Include file="Libs\LibGroupTalents-1.0\lib_cata.xml"/>
+    <Include file="Libs\LibGroupTalents-1.0\lib_wotlk.xml"/>
+
+    <!-- Load data file -->
+	<Script file="Data_MoP.lua"/>
+    <Script file="Data_Cata.lua"/>
+	<Script file="Data_WotLK.lua"/>
+	<Script file="Data_TBC.lua"/>
+
+    <!-- Load LibSpecDetection-1.0 -->
+    <Script file="LibSpecDetection-1.0.lua"/>
+</Ui>

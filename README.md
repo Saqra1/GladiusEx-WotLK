@@ -12,7 +12,9 @@ Note: I've now made version 2.0 the **Latest** version, no longer a pre-release,
 
 The Addon is to be placed in /Interface/AddOns (relative the WoW root folder).
 
-**Do not use the Code -> Download ZIP option, it will not work. It's only for developers who know how to use git submodules.**
+This fork also supports **Code -> Download ZIP**. All embedded libraries are
+included; no Git submodule setup is required. Name the extracted addon folder
+`GladiusEx`.
 
 # Notes
 
@@ -25,6 +27,15 @@ The "Incoming" Absorb/Heal portion of the healthbar module has been removed as t
 The "Cooldowns" module is only in beta mode. It works, but some abilities might be missing / having an incorrect spell ID (thus not working) / have an incorrect CD / be missing some conditional. Feel free to [report](https://github.com/ManneN1/LibCooldownTracker-1.0-3.3.5/issues) specific improvements that can be done, or create a pull request in [LibCooldownTracker-1.0 (3.3.5)](https://github.com/ManneN1/LibCooldownTracker-1.0-3.3.5/pulls).
 
 # Embedded library maintenance
+
+LibCooldownTracker-1.0 and both copies of LibSpecDetection-1.0 are tracked directly
+in this repository, with their existing local fixes preserved. Their upstream bases are:
+
+- [LibCooldownTracker-1.0](https://github.com/ManneN1/LibCooldownTracker-1.0-3.3.5), commit `f1ec0e9`.
+- [LibSpecDetection-1.0](https://github.com/ManneN1/LibSpecDetection-1.0), commit `7c18b89`; its copy inside LibCooldownTracker uses `3ddd6cf`.
+
+Update these files here and preserve upstream copyright and license headers.
+Releases package the versions committed in this repository.
 
 LibDualSpec-1.0 and AceDB-3.0 are tracked directly in this repository. The 3.3.5a
 LibDualSpec fork uses revision 100 so LibStub selects it over older embedded copies.
