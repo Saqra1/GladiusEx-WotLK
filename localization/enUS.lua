@@ -20,6 +20,12 @@ L["Enter an aura name or an exact numeric spell ID."] = true
 L["Enter a spell name or a positive whole spell ID."] = true
 L["Names match all ranks and effects with that name. Numeric IDs match only that exact spell and override name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."] = true
 
+-- Alerts module
+L["Alert sound"] = true
+L["Play a sound when this alert starts. Select None to disable sound."] = true
+L["Flash frame"] = true
+L["Flash the unit frame while this aura is active. Sound works independently."] = true
+
 -- Cooldowns module
 L["cat:pvp_trinket"] = "PvP Trinket"
 L["cat:mass_dispel"] = "Mass Dispel"

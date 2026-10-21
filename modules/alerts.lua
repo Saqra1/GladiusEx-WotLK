@@ -1,5 +1,6 @@
 local GladiusEx = _G.GladiusEx
 local L = LibStub("AceLocale-3.0"):GetLocale("GladiusEx")
+local LSM = LibStub("LibSharedMedia-3.0")
 
 -- globals
 local pairs = pairs
@@ -53,6 +54,7 @@ local Alerts = GladiusEx:NewGladiusExModule("Alerts", {
         healthThreshold = 0.25,
         healthPriority = 10,
         healthColor = { r = 1, g = 0, b = 0, a = 1 },
+        healthSound = "None",
 
         casts = true,
         castsSpells = GetDefaultCastsSpells(),
@@ -158,8 +160,7 @@ function Alerts:Reset(unit)
 end
 
 function Alerts:Test(unit)
-    self:ClearAllAlerts(unit)
-    self:SetAlert(unit, "test", 1, { r = 1, g = 0, b = 0, a = 1 })
+    self:Reset(unit)
 end
 
 function Alerts:Refresh(unit)
@@ -215,33 +216,45 @@ end
 
 local alerts = {}
 local alerts_color = {}
-function Alerts:SetAlert(unit, alert, priority, color)
+function Alerts:PlayAlertSound(sound)
+    if not sound or sound == "None" then return end
+    local path = LSM:Fetch("sound", sound, true)
+    if path and path ~= "" then PlaySoundFile(path) end
+end
+
+function Alerts:SetAlert(unit, alert, priority, color, sound, flash)
     assert(type(unit) == "string")
     assert(type(alert) == "string")
     assert(type(priority) == "number")
     assert(type(color) == "table")
-    if not alerts[unit] then alerts[unit] = { count = 0, priority = 0, current = false, alerts = {} } end
+    if not alerts[unit] then alerts[unit] = { count = 0, priority = 0, current = false, alerts = {}, flash = {} } end
     if not alerts_color[unit] then alerts_color[unit] = {} end
 
     if not alerts[unit].alerts[alert] then
         alerts[unit].alerts[alert] = priority
+        alerts[unit].flash[alert] = flash ~= false
         alerts_color[unit][alert] = color
         alerts[unit].count = alerts[unit].count + 1
 
-        if alerts[unit].count == 1 or alerts[unit].priority < priority then
+        if flash ~= false and (not alerts[unit].current or alerts[unit].priority < priority) then
             alerts[unit].priority = priority
             alerts[unit].current = alert
             self:StartFlash(unit, color)
         end
+        if self:IsUnitEnabled(unit) then self:PlayAlertSound(sound) end
+    elseif alerts[unit].flash[alert] ~= (flash ~= false) then
+        alerts[unit].flash[alert] = flash ~= false
+        self:UpdateAlertColor(unit)
     end
 end
 
 function Alerts:UpdateAlertColor(unit)
+    if not alerts[unit] then return end
     -- find new alert
     local new_alert
     local new_priority = 0
     for alert, priority in pairs(alerts[unit].alerts) do
-        if priority and priority > new_priority then
+        if priority and alerts[unit].flash[alert] ~= false and (not new_alert or priority > new_priority) then
             new_alert = alert
             new_priority = priority
         end
@@ -249,10 +262,14 @@ function Alerts:UpdateAlertColor(unit)
     GladiusEx:Log(unit, new_alert, new_priority, alerts[unit].priority)
     if new_alert then
         local cur_alert = alerts[unit].current
-        if not alerts[unit][cur_alert] or new_priority > alerts[unit].priority then
+        if not cur_alert or not alerts[unit].alerts[cur_alert] or alerts[unit].flash[cur_alert] == false or new_priority > alerts[unit].priority then
             alerts[unit].priority = new_priority
             alerts[unit].current = new_alert
-            self:SetFlashColor(unit, alerts_color[unit][new_alert])
+            if not cur_alert then
+                self:StartFlash(unit, alerts_color[unit][new_alert])
+            else
+                self:SetFlashColor(unit, alerts_color[unit][new_alert])
+            end
         end
     else
         alerts[unit].priority = 0
@@ -285,6 +302,7 @@ function Alerts:ClearAllAlerts(unit)
     if self.castSuccesses then self.castSuccesses[unit] = nil end
     if self.castEvents then self.castEvents[unit] = nil end
     if self.pendingCastStarts then self.pendingCastStarts[unit] = nil end
+    if self.castStops then self.castStops[unit] = nil end
 end
 
 function Alerts:UNIT_AURA(event, unit)
@@ -305,7 +323,7 @@ function Alerts:UNIT_AURA(event, unit)
         if not active[key] then self:ClearAlert(unit, "aura_" .. key) end
     end
     for key, aura in pairs(active) do
-        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color)
+        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color, aura.sound, aura.flash)
     end
     self.auraAlertKeys[unit] = active
 end
@@ -318,7 +336,7 @@ function Alerts:UNIT_HEALTH(event, unit)
     local healthMax = UnitHealthMax(unit)
 
     if not UnitIsDeadOrGhost(unit) and (health / healthMax) <= self.db[unit].healthThreshold then
-        self:SetAlert(unit, "health", self.db[unit].healthPriority, self.db[unit].healthColor)
+        self:SetAlert(unit, "health", self.db[unit].healthPriority, self.db[unit].healthColor, self.db[unit].healthSound)
     else
         self:ClearAlert(unit, "health")
     end
@@ -338,6 +356,7 @@ function Alerts:ShowCastAlert(unit, name, id, succeeded)
     local cast, key = GladiusEx:GetSpellRule(self.db[unit], "castsSpells", name, id)
     if not cast then return end
     local alert = "cast_" .. GladiusEx:SpellRuleKey(key)
+    local sound = cast.sound
     self.castAlertKeys = self.castAlertKeys or {}
     if succeeded then
         self.castSuccesses = self.castSuccesses or {}
@@ -345,13 +364,19 @@ function Alerts:ShowCastAlert(unit, name, id, succeeded)
         if last and last.key == alert and GetTime() - last.time < 0.05 then return end
         self.castSuccesses[unit] = {key = alert, time = GetTime()}
         if self:IsAlertActive(unit, alert) then return end
-        self:SetAlert(unit, alert, cast.priority, cast.color)
+        -- STOP can arrive before SUCCEEDED for a cast that already sounded.
+        local stopped = self.castStops and self.castStops[unit]
+        if stopped and stopped.alert == alert and GetTime() - stopped.time < 0.05 then sound = nil end
+        self:SetAlert(unit, alert, cast.priority, cast.color, sound)
         self:ClearAlert(unit, alert, 1)
     else
         local old = self.castAlertKeys[unit]
         if old and old.alert ~= alert then self:ClearAlert(unit, old.alert) end
         self.castAlertKeys[unit] = {alert = alert, name = name}
-        self:SetAlert(unit, alert, cast.priority, cast.color)
+        -- A channel's combat-log success can precede its unit start event.
+        local last = self.castSuccesses and self.castSuccesses[unit]
+        if last and last.key == alert and GetTime() - last.time < 0.05 then sound = nil end
+        self:SetAlert(unit, alert, cast.priority, cast.color, sound)
     end
 end
 
@@ -390,6 +415,8 @@ function Alerts:UNIT_SPELLCAST_STOP(event, unit, spell)
     end
     local current = self.castAlertKeys and self.castAlertKeys[unit]
     if current and (not spell or spell == current.name) then
+        self.castStops = self.castStops or {}
+        self.castStops[unit] = {alert = current.alert, time = GetTime()}
         self:ClearAlert(unit, current.alert)
         self.castAlertKeys[unit] = nil
     end
@@ -415,7 +442,23 @@ function Alerts:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, kind, sourceGUID, 
     end
 end
 
+function Alerts:GetSoundOption(get, set, disabled, order)
+    return {
+        type = "select",
+        name = L["Alert sound"],
+        desc = L["Play a sound when this alert starts. Select None to disable sound."],
+        dialogControl = "LSM30_Sound",
+        values = function() return LSM:HashTable("sound") end,
+        get = get,
+        set = set,
+        disabled = disabled,
+        order = order,
+    }
+end
+
 function Alerts:GetOptions(unit)
+    local newCastSound, newAuraSound = "None", "None"
+    local newAuraFlash = true
     local options
     options = {
         general = {
@@ -546,6 +589,10 @@ function Alerts:GetOptions(unit)
                     disabled = function() return not self.db[unit].health or not self:IsUnitEnabled(unit) end,
                     order = 40,
                 },
+                healthSound = self:GetSoundOption(
+                    function() return self.db[unit].healthSound end,
+                    function(info, value) self.db[unit].healthSound = value end,
+                    function() return not self.db[unit].health or not self:IsUnitEnabled(unit) end, 50),
             },
         },
         casts = {
@@ -588,10 +635,14 @@ function Alerts:GetOptions(unit)
                             disabled = function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end,
                             order = 3,
                         },
+                        sound = self:GetSoundOption(
+                            function() return newCastSound end,
+                            function(info, value) newCastSound = value end,
+                            function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end, 4),
                         add = {
                             type = "execute",
                             name = L["Add new cast"],
-                            order = 4,
+                            order = 5,
                         },
                     },
                 },
@@ -636,10 +687,21 @@ function Alerts:GetOptions(unit)
                             disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
                             order = 3,
                         },
+                        sound = self:GetSoundOption(
+                            function() return newAuraSound end,
+                            function(info, value) newAuraSound = value end,
+                            function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end, 4),
+                        flash = {
+                            type = "toggle", name = L["Flash frame"], order = 3.5,
+                            desc = L["Flash the unit frame while this aura is active. Sound works independently."],
+                            get = function() return newAuraFlash end,
+                            set = function(info, value) newAuraFlash = value end,
+                            disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
+                        },
                         add = {
                             type = "execute",
                             name = L["Add new aura"],
-                            order = 4,
+                            order = 5,
                         },
                     },
                 },
@@ -664,12 +726,12 @@ function Alerts:GetOptions(unit)
     end
     GladiusEx:ConfigureNewSpellRule(self, unit, "castsSpells", options.casts.args,
         options.casts.args.newCast.args,
-        function() return {priority = self.newCastPriority, color = self.newCastColor} end,
+        function() return {priority = self.newCastPriority, color = self.newCastColor, sound = newCastSound} end,
         function(cast) return self:SetupCastOptions(options, unit, cast) end,
         function() return not self:IsUnitEnabled(unit) or not self.db[unit].casts end)
     GladiusEx:ConfigureNewSpellRule(self, unit, "aurasSpells", options.auras.args,
         options.auras.args.newAura.args,
-        function() return {priority = self.newAuraPriority, color = self.newAuraColor} end,
+        function() return {priority = self.newAuraPriority, color = self.newAuraColor, sound = newAuraSound, flash = newAuraFlash} end,
         function(aura) return self:SetupAuraOptions(options, unit, aura) end,
         function() return not self:IsUnitEnabled(unit) or not self.db[unit].auras end)
 
@@ -682,6 +744,17 @@ end
 
 function Alerts:SetupAuraOptions(options, unit, spell)
     return self:SetupSpellOptions(options, unit, spell, "aurasSpells", "auras")
+end
+
+function Alerts:SetAuraFlash(unit, spell, value)
+    local rule = self.db[unit].aurasSpells[spell]
+    rule.flash = value
+    local alert = "aura_" .. GladiusEx:SpellRuleKey(spell)
+    for target in pairs(self.frame or {}) do
+        if self.db[target] == self.db[unit] and self:IsAlertActive(target, alert) then
+            self:SetAlert(target, alert, rule.priority, rule.color, rule.sound, value)
+        end
+    end
 end
 
 function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
@@ -708,9 +781,21 @@ function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
                     GladiusEx:UpdateFrames()
                 end,
             },
-            delete = {type = "execute", name = L["Delete"], order = 4, disabled = disabled},
+            sound = self:GetSoundOption(
+                function() return self.db[unit][field][spell].sound or "None" end,
+                function(info, value) self.db[unit][field][spell].sound = value end,
+                disabled, 4),
+            delete = {type = "execute", name = L["Delete"], order = 5, disabled = disabled},
         },
     }
+    if kind == "auras" then
+        group.args.flash = {
+            type = "toggle", name = L["Flash frame"], order = 3.5, disabled = disabled,
+            desc = L["Flash the unit frame while this aura is active. Sound works independently."],
+            get = function() return self.db[unit][field][spell].flash ~= false end,
+            set = function(info, value) self:SetAuraFlash(unit, spell, value) end,
+        }
+    end
     return GladiusEx:ConfigureSpellRule(self, unit, field, options[kind].args, spell, group,
         function(key) return self:SetupSpellOptions(options, unit, key, field, kind) end, disabled)
 end

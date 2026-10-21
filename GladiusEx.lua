@@ -241,6 +241,8 @@ function GladiusEx:OnInitialize()
     LSM:Register("statusbar", "Wglass (GladiusEx)", [[Interface\Addons\GladiusEx\media\Wglass]])
     LSM:Register("font", "Designosaur (GladiusEx)", [[Interface\Addons\GladiusEx\media\Designosaur-Regular.ttf]])
     LSM:Register("font", "Designosaur Italic (GladiusEx)", [[Interface\Addons\GladiusEx\media\Designosaur-Italic.ttf]])
+    LSM:Register("sound", "Raid warning (GladiusEx)", [[Sound\Interface\RaidWarning.wav]])
+    LSM:Register("sound", "Ready check (GladiusEx)", [[Sound\Interface\ReadyCheck.wav]])
 
     -- test environment
     self.test = false
