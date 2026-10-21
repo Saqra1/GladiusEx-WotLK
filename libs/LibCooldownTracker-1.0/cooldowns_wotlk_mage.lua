@@ -12,7 +12,8 @@ LCT_SpellData[12042] = {
   class = "MAGE",
   cooldown = 120,
   talent = true,
-  specID = { SPEC_MAGE_ARCANE },
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
+  talentSpecID = SPEC_MAGE_ARCANE,
 }
 
 -- Presence of Mind
@@ -20,7 +21,8 @@ LCT_SpellData[12043] = {
   class = "MAGE",
   cooldown = 120,
   talent = true,
-  specID = { SPEC_MAGE_ARCANE },
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
+  talentSpecID = SPEC_MAGE_ARCANE,
 }
 
 -- Evocation
@@ -89,8 +91,10 @@ LCT_SpellData[42873] = 2136
 -- Freeze
 LCT_SpellData[33395] = {
   cooldown = 25,
+  duration = 8,
   class = "MAGE",
   specID = { SPEC_MAGE_FROST },
+  pet = true,
 }
 
 -- Cone of Cold
@@ -134,9 +138,10 @@ LCT_SpellData[11958] = {
   opt_lower_cooldown = 384,
   cooldown_overload = { [SPEC_MAGE_FROST] = 384, },
   class = "MAGE",
-  specID = { SPEC_MAGE_FROST },
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
   talent = true,
   resets = { 122, 120, 12472, 11426, 31687, 45438, 44572 },
+  talentSpecID = SPEC_MAGE_FROST,
 }
 
 -- Dragon's Breath
@@ -165,7 +170,8 @@ LCT_SpellData[11129] = {
   cooldown = 120,
   class = "MAGE",
   talent = true,
-  specID = { SPEC_MAGE_FIRE },
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
+  talentSpecID = SPEC_MAGE_FIRE,
 }
 
 -- Icy Veins
@@ -173,7 +179,8 @@ LCT_SpellData[12472] = {
   cooldown = 180,
   class = "MAGE",
   talent = true,
-  specID = { SPEC_MAGE_FROST },
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
+  talentSpecID = SPEC_MAGE_FROST,
 }
 
 -- Counterspell
@@ -188,7 +195,8 @@ LCT_SpellData[11113] = {
   cooldown = 30,
   class = "MAGE",
   talent = true,
-  specID = { SPEC_MAGE_FIRE },
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
+  talentSpecID = SPEC_MAGE_FIRE,
 }
 LCT_SpellData[13018] = 11113
 LCT_SpellData[13019] = 11113
@@ -206,8 +214,9 @@ LCT_SpellData[11426] = {
   cooldown_overload = { [SPEC_MAGE_FROST] = 24, },
   class = "MAGE",
   talent = true,
-  specID = { SPEC_MAGE_FROST },
-  detects = { 11958 }
+  specID = { SPEC_MAGE_ARCANE, SPEC_MAGE_FIRE, SPEC_MAGE_FROST },
+  detects = { 11958 },
+  talentSpecID = SPEC_MAGE_FROST,
 }
 LCT_SpellData[13031] = 11426
 LCT_SpellData[13032] = 11426

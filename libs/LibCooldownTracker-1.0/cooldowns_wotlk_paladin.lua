@@ -7,6 +7,28 @@ local SPEC_PALADIN_HOLY        = 65
 local SPEC_PALADIN_PROTECTION  = 66
 local SPEC_PALADIN_RETRIBUTION = 70
 
+-- Aura Mastery
+LCT_SpellData[31821] = {
+  class = "PALADIN",
+  cooldown = 120,
+  duration = 6,
+  defensive = true,
+  talent = true,
+  specID = { SPEC_PALADIN_HOLY, SPEC_PALADIN_PROTECTION, SPEC_PALADIN_RETRIBUTION },
+  talentSpecID = SPEC_PALADIN_HOLY,
+}
+
+-- Divine Sacrifice
+LCT_SpellData[64205] = {
+  class = "PALADIN",
+  cooldown = 120,
+  duration = 10,
+  defensive = true,
+  talent = true,
+  specID = { SPEC_PALADIN_HOLY, SPEC_PALADIN_PROTECTION, SPEC_PALADIN_RETRIBUTION },
+  talentSpecID = SPEC_PALADIN_PROTECTION,
+}
+
 -- Blessing of Freedom
 LCT_SpellData[1044] = {
   class = "PALADIN",
@@ -23,6 +45,8 @@ LCT_SpellData[19752] = {
 LCT_SpellData[35395] = {
   class = "PALADIN",
   cooldown = 4,
+  talent = true,
+  specID = { SPEC_PALADIN_RETRIBUTION },
 }
 
 -- Hand of Sacrifice
@@ -93,7 +117,8 @@ LCT_SpellData[20925] = {
   class = "PALADIN",
   cooldown = 8,
   talent = true,
-  specID = { SPEC_PALADIN_PROTECTION },
+  specID = { SPEC_PALADIN_HOLY, SPEC_PALADIN_PROTECTION, SPEC_PALADIN_RETRIBUTION },
+  talentSpecID = SPEC_PALADIN_PROTECTION,
 }
 LCT_SpellData[20927] = 20925
 LCT_SpellData[20928] = 20925
@@ -140,7 +165,8 @@ LCT_SpellData[20216] = {
   class = "PALADIN",
   cooldown = 120,
   talent = true,
-  specID = { SPEC_PALADIN_HOLY },
+  specID = { SPEC_PALADIN_HOLY, SPEC_PALADIN_PROTECTION, SPEC_PALADIN_RETRIBUTION },
+  talentSpecID = SPEC_PALADIN_HOLY,
 }
 
 -- Righteous Defense
@@ -165,7 +191,8 @@ LCT_SpellData[20066] = {
   class = "PALADIN",
   cooldown = 60,
   talent = true,
-  specID = { SPEC_PALADIN_RETRIBUTION },
+  specID = { SPEC_PALADIN_HOLY, SPEC_PALADIN_PROTECTION, SPEC_PALADIN_RETRIBUTION },
+  talentSpecID = SPEC_PALADIN_RETRIBUTION,
 }
 
 -- Divine Protection
@@ -180,7 +207,8 @@ LCT_SpellData[20473] = {
   cooldown = 6,
   talent = true,
   detects = { 20216 },
-  specID = { SPEC_PALADIN_HOLY },
+  specID = { SPEC_PALADIN_HOLY, SPEC_PALADIN_PROTECTION, SPEC_PALADIN_RETRIBUTION },
+  talentSpecID = SPEC_PALADIN_HOLY,
 }
 LCT_SpellData[20929] = 20473
 LCT_SpellData[20930] = 20473
@@ -214,7 +242,7 @@ LCT_SpellData[53385] = {
   class = "PALADIN",
   cooldown = 10,
   talent = true,
-  specID = { SPEC_PALADIN_PROTECTION },
+  specID = { SPEC_PALADIN_RETRIBUTION },
 }
 
 -- Hammer of the Righteous
@@ -222,15 +250,13 @@ LCT_SpellData[53595] = {
   class = "PALADIN",
   cooldown = 6,
   talent = true,
-  specID = { SPEC_PALADIN_HOLY },
+  specID = { SPEC_PALADIN_PROTECTION },
 }
 
 -- Divine Plea
 LCT_SpellData[54428] = {
   class = "PALADIN",
   cooldown = 60,
-  talent = true,
-  specID = { SPEC_PALADIN_HOLY },
 }
 
 -- Shield of Righteousness

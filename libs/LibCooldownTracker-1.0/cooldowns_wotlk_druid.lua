@@ -91,7 +91,8 @@ LCT_SpellData[18562] = {
   class = "DRUID",
   cooldown = 15,
   talent = true,
-  specID = { SPEC_DRUID_RESTO },
+  specID = { SPEC_DRUID_BALANCE, SPEC_DRUID_FERAL, SPEC_DRUID_RESTO },
+  talentSpecID = SPEC_DRUID_RESTO,
 }
 
 -- Growl
@@ -113,10 +114,11 @@ LCT_SpellData[16979] = {
   class = "DRUID",
   cooldown = 15,
   talent = true,
-  specID = { SPEC_DRUID_FERAL },
+  specID = { SPEC_DRUID_BALANCE, SPEC_DRUID_FERAL, SPEC_DRUID_RESTO },
   sets_cooldowns = {
 	{ spellid = 49376, cooldown = 15 }
-  }
+  },
+  talentSpecID = SPEC_DRUID_FERAL,
 }
 
 -- Feral Charge (Cat)
@@ -124,10 +126,11 @@ LCT_SpellData[49376] = {
   class = "DRUID",
   cooldown = 30,
   talent = true,
-  specID = { SPEC_DRUID_FERAL },
+  specID = { SPEC_DRUID_BALANCE, SPEC_DRUID_FERAL, SPEC_DRUID_RESTO },
   sets_cooldowns = {
 	{ spellid = 16979, cooldown = 15 }
-  }
+  },
+  talentSpecID = SPEC_DRUID_FERAL,
 }
 
 -- Rebirth
@@ -158,7 +161,6 @@ LCT_SpellData[48564] = 33878
 LCT_SpellData[16857] = {
   class = "DRUID",
   cooldown = 6,
-  specID = { SPEC_DRUID_FERAL },
   resets = { 5215 },
 }
 
@@ -169,7 +171,8 @@ LCT_SpellData[17116] = {
   talent = true,
   cooldown_starts_on_dispel = true,
   cooldown_starts_on_aura_fade = true,
-  specID = { SPEC_DRUID_RESTO },
+  specID = { SPEC_DRUID_BALANCE, SPEC_DRUID_FERAL, SPEC_DRUID_RESTO },
+  talentSpecID = SPEC_DRUID_RESTO,
 }
 
 -- Tranquility
@@ -208,6 +211,7 @@ LCT_SpellData[50334] = {
   class = "DRUID",
   cooldown = 180,
   specID = { SPEC_DRUID_FERAL },
+  talent = true,
 }
 
 -- Survival Instincts
@@ -215,7 +219,9 @@ LCT_SpellData[61336] = {
   class = "DRUID",
   cooldown = 180,
   duration = 12,
-  specID = { SPEC_DRUID_FERAL },
+  specID = { SPEC_DRUID_BALANCE, SPEC_DRUID_FERAL, SPEC_DRUID_RESTO },
+  talent = true,
+  talentSpecID = SPEC_DRUID_FERAL,
 }
 
 -- Starfall

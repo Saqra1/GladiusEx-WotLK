@@ -7,6 +7,15 @@ local SPEC_DK_BLOOD  = 250
 local SPEC_DK_FROST  = 251
 local SPEC_DK_UNHOLY = 252
 
+-- Gnaw (ghoul)
+LCT_SpellData[47481] = {
+  class = "DEATHKNIGHT",
+  cooldown = 60,
+  duration = 3,
+  pet = true,
+  stun = true,
+}
+
 -- Death Knight/Blood
 -- Blood Tap
 LCT_SpellData[45529] = {
@@ -27,6 +36,8 @@ LCT_SpellData[47476] = {
 LCT_SpellData[55233] = {
   class = "DEATHKNIGHT",
   cooldown = 60,
+  talent = true,
+  specID = { SPEC_DK_BLOOD },
 }
 
 -- Death Knight/Blood/talents
@@ -35,14 +46,16 @@ LCT_SpellData[48982] = {
   class = "DEATHKNIGHT",
   cooldown = 30,
   talent = true,
-  specID = { SPEC_DK_BLOOD },
+  specID = { SPEC_DK_BLOOD, SPEC_DK_FROST, SPEC_DK_UNHOLY },
+  talentSpecID = SPEC_DK_BLOOD,
 }
 -- Unholy Frenzy
 LCT_SpellData[49016] = {
   class = "DEATHKNIGHT",
   cooldown = 180,
   talent = true,
-  specID = { SPEC_DK_BLOOD },
+  specID = { SPEC_DK_BLOOD, SPEC_DK_FROST, SPEC_DK_UNHOLY },
+  talentSpecID = SPEC_DK_BLOOD,
 }
 -- Dancing Rune Weapon
 LCT_SpellData[49028] = {
@@ -77,15 +90,17 @@ LCT_SpellData[49039] = {
   class = "DEATHKNIGHT",
   cooldown = 120,
   talent = true,
-  specID = { SPEC_DK_UNHOLY },
+  specID = { SPEC_DK_BLOOD, SPEC_DK_FROST, SPEC_DK_UNHOLY },
   duration = 10,
+  talentSpecID = SPEC_DK_FROST,
 }
 -- Hungering Cold
 LCT_SpellData[49203] = {
   class = "DEATHKNIGHT",
   cooldown = 60,
   talent = true,
-  specID = { SPEC_DK_FROST },
+  specID = { SPEC_DK_BLOOD, SPEC_DK_FROST, SPEC_DK_UNHOLY },
+  talentSpecID = SPEC_DK_FROST,
 }
 
 -- Death Knight/Unholy
@@ -118,7 +133,8 @@ LCT_SpellData[51052] = {
   cooldown = 120,
   talent = true,
   duration = 10,
-  specID = { SPEC_DK_UNHOLY },
+  specID = { SPEC_DK_BLOOD, SPEC_DK_FROST, SPEC_DK_UNHOLY },
+  talentSpecID = SPEC_DK_UNHOLY,
 }
 -- Summon Gargoyle
 LCT_SpellData[49206] = {
@@ -127,4 +143,22 @@ LCT_SpellData[49206] = {
   talent = true,
   duration = 30,
   specID = { SPEC_DK_UNHOLY },
+}
+
+-- Additional pet cooldowns (original 3.3.5a Spell/SkillLineAbility data).
+
+-- Huddle
+LCT_SpellData[47484] = {
+  class = "DEATHKNIGHT",
+  cooldown = 45,
+  pet = true,
+  duration = 10,
+  defensive = true,
+}
+
+-- Leap
+LCT_SpellData[47482] = {
+  class = "DEATHKNIGHT",
+  cooldown = 20,
+  pet = true,
 }

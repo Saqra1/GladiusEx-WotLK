@@ -58,7 +58,7 @@
 	sent only to the correct subscriber (callback).
 ]]
 
-local version = 13
+local version = 17
 local lib = LibStub:NewLibrary("LibCooldownTracker-1.0", version)
 
 if not lib then return end
@@ -67,6 +67,20 @@ if not lib then return end
 local pairs, type, next, select, assert, unpack = pairs, type, next, select, assert, unpack
 local tinsert, tremove = table.insert, table.remove
 local GetTime, UnitGUID, IsInInstance = GetTime, UnitGUID, IsInInstance
+
+local owner_pet_units = { player = "pet" }
+local summoned_pet_owners = {}
+for i = 1, 5 do
+	owner_pet_units["arena" .. i] = "arenapet" .. i
+	if i <= 4 then owner_pet_units["party" .. i] = "partypet" .. i end
+end
+
+local function GetPetOwnerGUID(guid)
+	for owner, pet in pairs(owner_pet_units) do
+		if UnitGUID(pet) == guid then return UnitGUID(owner) end
+	end
+	return summoned_pet_owners[guid]
+end
 
 lib.frame = lib.frame or CreateFrame("Frame")
 lib.callbacks = lib.callbacks or LibStub("CallbackHandler-1.0"):New(lib)
@@ -342,10 +356,17 @@ local function FireCooldownEvent(event, guid, spellid, isEnemy, prefix)
 end
 
 local function CooldownEvent(event, guid, spellid, isEnemy)
+	if not guid then return end
 
 	-- Get the top parent cooldown data without considering prefixes
     local spelldata, tmpSpellID = lib:GetCooldownData(spellid)
     if not spelldata then return end
+
+	local petGUID
+	if spelldata.pet then
+		petGUID = guid
+		guid = GetPetOwnerGUID(guid) or guid
+	end
 
 	if tmpSpellID then
 		spellid = tmpSpellID
@@ -356,6 +377,10 @@ local function CooldownEvent(event, guid, spellid, isEnemy)
         lib.tracked_players[guid] = {}
     end
     local tpu = lib.tracked_players[guid]
+	-- A newly summoned pet starts with its own cooldowns.
+	if petGUID and tpu[spellid] and tpu[spellid].petGUID ~= petGUID then
+		tpu[spellid] = nil
+	end
 
     -- Get current time
     local now = GetTime()
@@ -377,6 +402,7 @@ local function CooldownEvent(event, guid, spellid, isEnemy)
     if not tpu[spellid] then
         tpu[spellid] = {}
     end
+	if petGUID then tpu[spellid].petGUID = petGUID end
 
     -- Register event time
     if not tpu[spellid].events then
@@ -527,6 +553,7 @@ local function enable()
 	lib.frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 
 	lib.tracked_players = {}
+	summoned_pet_owners = {}
 end
 
 local function disable()
@@ -829,6 +856,7 @@ function lib:IterateCooldowns(class, specID, race, prefix)
 end
 
 function events:PLAYER_ENTERING_WORLD()
+	summoned_pet_owners = {}
 	local instanceType = select(2, IsInInstance())
 
 	-- reset cooldowns when joining an arena
@@ -847,7 +875,12 @@ function events:UNIT_SPELLCAST_SUCCEEDED(event, unit, spellName, rank, lineID, s
 	--CooldownEvent(event, UnitGUID(unit), spellId, isEnemy)
 end
 
-function events:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, sourceGUID, e, sourceFlags, d, _, _, spellId)
+function events:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, sourceGUID, sourceName, sourceFlags, destGUID, _, _, spellId)
+    -- Guardians such as Spirit Wolves may have no pet unit token.
+	if event == "SPELL_SUMMON" and sourceGUID and destGUID then
+		summoned_pet_owners[destGUID] = GetPetOwnerGUID(sourceGUID) or sourceGUID
+		return
+	end
     
 	local isEnemy = false
 	local b = bit.band(sourceFlags, COMBATLOG_OBJECT_REACTION_HOSTILE)

@@ -17,7 +17,9 @@ local UnitBuff = Spectate and Spectate.UnitBuff or UnitBuff
 local UnitFactionGroup = Spectate and Spectate.UnitFactionGroup or UnitFactionGroup
 local UnitClass = Spectate and Spectate.UnitClass or UnitClass
 local UnitRace = Spectate and Spectate.UnitRace or UnitRace
-local GetUnitCooldownInfo = Spectate and Spectate.GetUnitCooldownInfo or CT.GetUnitCooldownInfo
+local GetUnitCooldownInfo = Spectate and Spectate.GetUnitCooldownInfo or function(unit, spellid)
+	return CT:GetUnitCooldownInfo(unit, spellid)
+end
 
 local function MakeGroupDb(settings)
 	local defaults = {
@@ -141,6 +143,29 @@ local Cooldowns = GladiusEx:NewGladiusExModule("Cooldowns",
 local MAX_ICONS = 40
 
 local unit_state = {}
+
+local renamed_spell_ids = { [19647] = 19244, [51490] = 59159, [48141] = 48181 }
+function Cooldowns:MigrateSpellSelections()
+	if GetAccountExpansionLevel() ~= 2 then return end
+	for _, unit in ipairs({ "arena", "party" }) do
+		for group = 1, self:GetNumGroups(unit) do
+			local spells = self:GetGroupDB(unit, group).cooldownsSpells
+			for old, new in pairs(renamed_spell_ids) do
+				if spells[old] ~= nil then
+					-- Preserve disabled choices when replacing a rank or incorrect ID.
+					if spells[new] ~= false then spells[new] = spells[old] end
+					spells[old] = nil
+				end
+			end
+		end
+	end
+end
+
+function Cooldowns:OnInitialize()
+	self.super.OnInitialize(self)
+	self:MigrateSpellSelections()
+end
+
 function Cooldowns:GetGroupState(unit, group)
 	local gu = unit_state[unit]
 	if not gu then
@@ -256,6 +281,7 @@ end
 
 function Cooldowns:OnProfileChanged()
 	self.super.OnProfileChanged(self)
+	self:MigrateSpellSelections()
 	self:SpellSortingChanged()
 end
 
@@ -501,8 +527,9 @@ local function GetCooldownList(unit, group)
 	for spellid, spelldata in CT:IterateCooldowns(class, specID, race) do
 		-- check if the spell is enabled by the user
 		if db.cooldownsSpells[spellid] or (spelldata.replaces and db.cooldownsSpells[spelldata.replaces]) then
+			local tracked = GetUnitCooldownInfo(unit, spellid)
 			-- check if the spell has a cooldown valid for an arena, and check if it is a talent that has not yet been detected
-			if (not spelldata.cooldown or spelldata.cooldown < 600) and ((not spelldata.glyph and not spelldata.talent and not spelldata.pet and not spelldata.symbiosis) or (tracked and tracked.detected) or not db.cooldownsHideTalentsUntilDetected) then
+			if (not spelldata.cooldown or spelldata.cooldown < 600 or spelldata.usable_in_arena) and ((not spelldata.glyph and not spelldata.talent and not spelldata.pet and not spelldata.symbiosis) or (tracked and tracked.detected) or not db.cooldownsHideTalentsUntilDetected) then
 				-- check if the spell requires an aura
 				if not spelldata.requires_aura or UnitBuff(unit, spelldata.requires_aura_name) then
 					if spelldata.replaces then
@@ -1709,8 +1736,18 @@ function Cooldowns:MakeGroupOptions(unit, group)
 	end
 
 	local args = group_options.args.cooldowns.args
-	for spellid, spelldata in pairs(CT:GetCooldownsData()) do
-		if type(spelldata) == "table" and (not spelldata.cooldown or spelldata.cooldown < 600) then
+	local spell_data = CT:GetCooldownsData()
+	local sorted_spells = {}
+	for spellid, spelldata in pairs(spell_data) do
+		if type(spelldata) == "table" then tinsert(sorted_spells, spellid) end
+	end
+	tsort(sorted_spells, function(a, b)
+		if spell_data[a].name == spell_data[b].name then return a < b end
+		return spell_data[a].name < spell_data[b].name
+	end)
+	for order, spellid in ipairs(sorted_spells) do
+		local spelldata = spell_data[spellid]
+		if type(spelldata) == "table" and (not spelldata.cooldown or spelldata.cooldown < 600 or spelldata.usable_in_arena) then
 			local cats = {}
 			if spelldata.pvp_trinket then tinsert(cats, L["cat:pvp_trinket"]) end
 			if spelldata.cc then tinsert(cats, L["cat:cc"]) end
@@ -1772,7 +1809,7 @@ function Cooldowns:MakeGroupOptions(unit, group)
 				get = getSpell,
 				set = setSpell,
 				disabled = function() return not self:IsUnitEnabled(unit) end,
-				order = spelldata.name:byte(1) * 0xff + spelldata.name:byte(2),
+				order = order,
 			}
 			if spelldata.class then
 				if not args[spelldata.class] then
@@ -1786,9 +1823,10 @@ function Cooldowns:MakeGroupOptions(unit, group)
                         args = {}
 					}
 				end
-				if spelldata.specID then
-					-- spec
-					for _, specID in ipairs(spelldata.specID) do
+				if spelldata.specID and not spelldata.pet then
+					-- Group by talent tree while allowing hybrid builds to track the spell.
+					local optionSpecs = spelldata.talentSpecID and { spelldata.talentSpecID } or spelldata.specID
+					for _, specID in ipairs(optionSpecs) do
 						if not args[spelldata.class].args["spec" .. specID] then
 							local name = GladiusEx.Data.specIDToName[specID]
 							args[spelldata.class].args["spec" .. specID] = {
@@ -1802,7 +1840,7 @@ function Cooldowns:MakeGroupOptions(unit, group)
 						end
 						args[spelldata.class].args["spec" .. specID].args["spell" .. spellid] = spellconfig
 					end
-				elseif spelldata.talent then
+				elseif spelldata.talent and not spelldata.pet then
 					-- talent
 					if not args[spelldata.class].args.talents then
 						args[spelldata.class].args.talents = {
@@ -1842,9 +1880,11 @@ function Cooldowns:MakeGroupOptions(unit, group)
 			elseif spelldata.race then
 				-- racial
 				if not args[spelldata.race] then
+					local raceID = GladiusEx.Data.raceNamesByID[spelldata.race] or (spelldata.race == "Scourge" and 5)
+					local raceName = raceID and GladiusEx.Data.raceNamesByID[raceID] or spelldata.race
 					args[spelldata.race] = {
 						type = "group",
-						name = spelldata.race,
+						name = L[raceName],
 						icon = function() return [[Interface\CHARACTERFRAME\TEMPORARYPORTRAIT]] .. (random(0, 1) == 0 and "-FEMALE-" or "-MALE-") .. spelldata.race end,
 						disabled = function() return not self:IsUnitEnabled(unit) end,
 						order = 3,

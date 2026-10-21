@@ -12,7 +12,8 @@ LCT_SpellData[17962] = {
   cooldown = 10,
   class = "WARLOCK",
   talent = true,
-  specID = { SPEC_WARLOCK_DESTRUCTION },
+  specID = { SPEC_WARLOCK_AFFLICTION, SPEC_WARLOCK_DEMONOLOGY, SPEC_WARLOCK_DESTRUCTION },
+  talentSpecID = SPEC_WARLOCK_DESTRUCTION,
 }
 
 -- Suffering
@@ -123,15 +124,6 @@ LCT_SpellData[47992] = 7814
 LCT_SpellData[29858] = {
   class = "WARLOCK",
   cooldown = 180,
-  pet = true,
-}
-
--- Amplify Curse
-LCT_SpellData[18288] = {
-  class = "WARLOCK",
-  cooldown = 180,
-  talent = true,
-  specID = { SPEC_WARLOCK_AFFLICTION },
 }
 
 -- Curse of Doom
@@ -161,7 +153,9 @@ LCT_SpellData[58887] = 29893
 LCT_SpellData[17877] = {
   cooldown = 15,
   class = "WARLOCK",
-  specID = { SPEC_WARLOCK_DESTRUCTION },
+  specID = { SPEC_WARLOCK_AFFLICTION, SPEC_WARLOCK_DEMONOLOGY, SPEC_WARLOCK_DESTRUCTION },
+  talent = true,
+  talentSpecID = SPEC_WARLOCK_DESTRUCTION,
 }
 LCT_SpellData[18867] = 17877
 LCT_SpellData[18868] = 17877
@@ -188,6 +182,9 @@ LCT_SpellData[27275] = 6360
 LCT_SpellData[18708] = {
   class = "WARLOCK",
   cooldown = 180,
+  talent = true,
+  talentSpecID = SPEC_WARLOCK_DEMONOLOGY,
+  specID = { SPEC_WARLOCK_AFFLICTION, SPEC_WARLOCK_DEMONOLOGY, SPEC_WARLOCK_DESTRUCTION },
 }
 
 -- Devour Magic
@@ -212,12 +209,16 @@ LCT_SpellData[50796] = {
 }
 
 -- Haunt
-LCT_SpellData[48141] = {
+LCT_SpellData[48181] = {
   class = "WARLOCK",
   cooldown = 8,
   talent = true,
   specID = { SPEC_WARLOCK_AFFLICTION },
 }
+
+LCT_SpellData[59161] = 48181
+LCT_SpellData[59163] = 48181
+LCT_SpellData[59164] = 48181
 
 -- Metamorphosis
 LCT_SpellData[59672] = {
@@ -240,3 +241,68 @@ LCT_SpellData[48020] = {
   cooldown = 30,
 }
 LCT_SpellData[61290] = 47897
+
+-- Additional pet cooldowns (original 3.3.5a Spell/SkillLineAbility data).
+
+-- Anguish
+LCT_SpellData[33698] = {
+  class = "WARLOCK",
+  cooldown = 5,
+  pet = true,
+  specID = { SPEC_WARLOCK_DEMONOLOGY },
+}
+LCT_SpellData[33699] = 33698
+LCT_SpellData[33700] = 33698
+LCT_SpellData[47993] = 33698
+
+-- Cleave
+LCT_SpellData[30213] = {
+  class = "WARLOCK",
+  cooldown = 6,
+  pet = true,
+  specID = { SPEC_WARLOCK_DEMONOLOGY },
+}
+LCT_SpellData[30219] = 30213
+LCT_SpellData[30223] = 30213
+LCT_SpellData[47994] = 30213
+
+-- Intercept
+LCT_SpellData[30151] = {
+  class = "WARLOCK",
+  cooldown = 30,
+  pet = true,
+  duration = 3,
+  stun = true,
+  specID = { SPEC_WARLOCK_DEMONOLOGY },
+}
+LCT_SpellData[30194] = 30151
+LCT_SpellData[30198] = 30151
+LCT_SpellData[47996] = 30151
+
+-- Sacrifice
+LCT_SpellData[7812] = {
+  class = "WARLOCK",
+  cooldown = 60,
+  pet = true,
+  duration = 30,
+  defensive = true,
+}
+LCT_SpellData[19438] = 7812
+LCT_SpellData[19440] = 7812
+LCT_SpellData[19441] = 7812
+LCT_SpellData[19442] = 7812
+LCT_SpellData[19443] = 7812
+LCT_SpellData[27273] = 7812
+LCT_SpellData[47985] = 7812
+LCT_SpellData[47986] = 7812
+
+-- Shadow Bite
+LCT_SpellData[54049] = {
+  class = "WARLOCK",
+  cooldown = 6,
+  pet = true,
+}
+LCT_SpellData[54050] = 54049
+LCT_SpellData[54051] = 54049
+LCT_SpellData[54052] = 54049
+LCT_SpellData[54053] = 54049

@@ -1346,9 +1346,12 @@ function Spectate.UnitRace(unit)
 
     local raceID = Spectate.units[unit].raceID
     local race = raceID and GladiusEx.Data.raceNamesByID[raceID] or "Human"
-    local enRace = L[race]
+    local enRace = race
+    if raceID == 4 then enRace = "NightElf"
+    elseif raceID == 5 then enRace = "Scourge"
+    elseif raceID == 10 then enRace = "BloodElf" end
     
-	return race, enRace
+	return L[race], enRace
 end
 
 function Spectate.UnitFactionGroup(unit)

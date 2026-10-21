@@ -50,7 +50,6 @@ LCT_SpellData[64901] = {
 LCT_SpellData[586] = {
   class = "PRIEST",
   cooldown = 30,
-  specID = { SPEC_PRIEST_SHADOW },
   opt_lower_cooldown = 24,
 }
 
@@ -59,13 +58,17 @@ LCT_SpellData[10060] = {
   class = "PRIEST",
   cooldown = 120,
   talent = true,
-  specID = { SPEC_PRIEST_DISC },
+  specID = { SPEC_PRIEST_DISC, SPEC_PRIEST_HOLY, SPEC_PRIEST_SHADOW },
+  talentSpecID = SPEC_PRIEST_DISC,
 }
 
 -- Desperate Prayer
 LCT_SpellData[48173] = {
   class = "PRIEST",
   cooldown = 120,
+  talent = true,
+  talentSpecID = SPEC_PRIEST_HOLY,
+  specID = { SPEC_PRIEST_DISC, SPEC_PRIEST_HOLY, SPEC_PRIEST_SHADOW },
 }
 --LCT_SpellData[19236] = 48173
 LCT_SpellData[19238] = 48173
@@ -90,7 +93,8 @@ LCT_SpellData[15487] = {
   class = "PRIEST",
   cooldown = 45,
   talent = true,
-  specID = { SPEC_PRIEST_SHADOW },
+  specID = { SPEC_PRIEST_DISC, SPEC_PRIEST_HOLY, SPEC_PRIEST_SHADOW },
+  talentSpecID = SPEC_PRIEST_SHADOW,
 }
 
 -- Shadowfiend
@@ -142,8 +146,9 @@ LCT_SpellData[48113] = 33076
 LCT_SpellData[14751] = {
   class = "PRIEST",
   cooldown = 180,
-  specID = { SPEC_PRIEST_DISC, SPEC_PRIEST_SHADOW, SPEC_PRIEST_HOLY },
+  specID = { SPEC_PRIEST_DISC, SPEC_PRIEST_HOLY, SPEC_PRIEST_SHADOW },
   talent = true,
+  talentSpecID = SPEC_PRIEST_DISC,
 }
 
 -- Pain Suppression
@@ -165,7 +170,8 @@ LCT_SpellData[724] = {
   class = "PRIEST",
   cooldown = 180,
   talent = true,
-  specID = { SPEC_PRIEST_HOLY },
+  specID = { SPEC_PRIEST_DISC, SPEC_PRIEST_HOLY, SPEC_PRIEST_SHADOW },
+  talentSpecID = SPEC_PRIEST_HOLY,
 }
 LCT_SpellData[27870] = 724
 LCT_SpellData[27871] = 724
@@ -206,4 +212,15 @@ LCT_SpellData[64044] = {
   cooldown = 120,
   talent = true,
   specID = { SPEC_PRIEST_SHADOW },
+}
+
+-- Additional pet cooldowns (original 3.3.5a Spell/SkillLineAbility data).
+
+-- Shadowcrawl
+LCT_SpellData[63619] = {
+  class = "PRIEST",
+  cooldown = 6,
+  pet = true,
+  duration = 5,
+  offensive = true,
 }

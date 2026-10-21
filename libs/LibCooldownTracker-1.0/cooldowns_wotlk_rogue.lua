@@ -20,7 +20,8 @@ LCT_SpellData[13877] = {
   cooldown = 120,
   class = "ROGUE",
   talent = true,
-  specID = { SPEC_ROGUE_COMBAT },
+  specID = { SPEC_ROGUE_ASSA, SPEC_ROGUE_COMBAT, SPEC_ROGUE_SUB },
+  talentSpecID = SPEC_ROGUE_COMBAT,
 }
 
 -- Cold Blood
@@ -29,7 +30,8 @@ LCT_SpellData[14177] = {
   class = "ROGUE",
   cooldown_starts_on_aura_fade = true,
   talent = true,
-  specID = { SPEC_ROGUE_ASSA },
+  specID = { SPEC_ROGUE_ASSA, SPEC_ROGUE_COMBAT, SPEC_ROGUE_SUB },
+  talentSpecID = SPEC_ROGUE_ASSA,
 }
 
 -- Shadowstep
@@ -86,7 +88,8 @@ LCT_SpellData[14251] = {
   cooldown = 6,
   class = "ROGUE",
   talent = true,
-  specID = { SPEC_ROGUE_COMBAT },
+  specID = { SPEC_ROGUE_ASSA, SPEC_ROGUE_COMBAT, SPEC_ROGUE_SUB },
+  talentSpecID = SPEC_ROGUE_COMBAT,
 }
 
 -- Feint
@@ -107,7 +110,8 @@ LCT_SpellData[14278] = {
   cooldown = 20,
   class = "ROGUE",
   talent = true,
-  specID = { SPEC_ROGUE_SUB },
+  specID = { SPEC_ROGUE_ASSA, SPEC_ROGUE_COMBAT, SPEC_ROGUE_SUB },
+  talentSpecID = SPEC_ROGUE_SUB,
 }
 
 -- Stealth
@@ -124,7 +128,8 @@ LCT_SpellData[13750] = {
   cooldown = 180,
   class = "ROGUE",
   talent = true,
-  specID = { SPEC_ROGUE_COMBAT },
+  specID = { SPEC_ROGUE_ASSA, SPEC_ROGUE_COMBAT, SPEC_ROGUE_SUB },
+  talentSpecID = SPEC_ROGUE_COMBAT,
 }
 
 -- Premeditation
@@ -139,7 +144,7 @@ LCT_SpellData[13750] = {
 LCT_SpellData[14185] = {
   cooldown = 600,
   class = "ROGUE",
-  specID = { SPEC_ROGUE_SUB },
+  specID = { SPEC_ROGUE_ASSA, SPEC_ROGUE_COMBAT, SPEC_ROGUE_SUB },
   talent = true,
   resets = {
     -- Always reset
@@ -147,6 +152,8 @@ LCT_SpellData[14185] = {
     -- Only reset with the glyph, but we consider everyone uses said glyph
     1766, 13877, 51722
   },
+  talentSpecID = SPEC_ROGUE_SUB,
+  usable_in_arena = true,
 }
 
 -- Kidney Shot

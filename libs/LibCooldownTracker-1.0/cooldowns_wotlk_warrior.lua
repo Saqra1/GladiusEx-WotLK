@@ -13,7 +13,8 @@ LCT_SpellData[12292] = {
   cooldown = 180,
   talent = true,
   duration = 30,
-  specID = { SPEC_WARRIOR_FURY },
+  specID = { SPEC_WARRIOR_ARMS, SPEC_WARRIOR_FURY, SPEC_WARRIOR_PROT },
+  talentSpecID = SPEC_WARRIOR_FURY,
 }
 
 -- Shield Block
@@ -27,7 +28,8 @@ LCT_SpellData[12294] = {
   class = "WARRIOR",
   cooldown = 5,
   talent = true,
-  specID = { SPEC_WARRIOR_ARMS },
+  specID = { SPEC_WARRIOR_ARMS, SPEC_WARRIOR_FURY, SPEC_WARRIOR_PROT },
+  talentSpecID = SPEC_WARRIOR_ARMS,
 }
 LCT_SpellData[21551] = 12294
 LCT_SpellData[21552] = 12294
@@ -43,7 +45,8 @@ LCT_SpellData[23881] = {
   cooldown = 4,
   talent = true,
   detects = { 12292 },
-  specID = { SPEC_WARRIOR_FURY },
+  specID = { SPEC_WARRIOR_ARMS, SPEC_WARRIOR_FURY, SPEC_WARRIOR_PROT },
+  talentSpecID = SPEC_WARRIOR_FURY,
 }
 
 -- Intervene
@@ -108,7 +111,8 @@ LCT_SpellData[12809] = {
   class = "WARRIOR",
   cooldown = 30,
   talent = true,
-  specID = { SPEC_WARRIOR_PROT },
+  specID = { SPEC_WARRIOR_ARMS, SPEC_WARRIOR_FURY, SPEC_WARRIOR_PROT },
+  talentSpecID = SPEC_WARRIOR_PROT,
 }
 
 -- Pummel
@@ -154,8 +158,6 @@ LCT_SpellData[676] = {
 LCT_SpellData[6572] = {
   class = "WARRIOR",
   cooldown = 5,
-  talent = true,
-  specID = { SPEC_WARRIOR_PROT },
 }
 LCT_SpellData[6574] = 6572
 LCT_SpellData[7379] = 6572
@@ -172,7 +174,8 @@ LCT_SpellData[12975] = {
   cooldown = 180,
   talent = true,
   duration = 20,
-  specID = { SPEC_WARRIOR_PROT },
+  specID = { SPEC_WARRIOR_ARMS, SPEC_WARRIOR_FURY, SPEC_WARRIOR_PROT },
+  talentSpecID = SPEC_WARRIOR_PROT,
 }
 
 -- Recklessness
@@ -225,6 +228,9 @@ LCT_SpellData[2687] = {
 LCT_SpellData[12328] = {
   class = "WARRIOR",
   cooldown = 30,
+  talent = true,
+  talentSpecID = SPEC_WARRIOR_ARMS,
+  specID = { SPEC_WARRIOR_ARMS, SPEC_WARRIOR_FURY, SPEC_WARRIOR_PROT },
 }
 
 -- Intercept

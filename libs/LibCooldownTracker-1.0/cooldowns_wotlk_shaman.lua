@@ -24,8 +24,9 @@ LCT_SpellData[16188] = {
   cooldown = 120,
   class = "SHAMAN",
   talent = true,
-  specID = { SPEC_SHAMAN_RESTORATION },
+  specID = { SPEC_SHAMAN_ELEMENTAL, SPEC_SHAMAN_ENHANCEMENT, SPEC_SHAMAN_RESTORATION },
   cooldown_starts_on_dispel = true,
+  talentSpecID = SPEC_SHAMAN_RESTORATION,
 }
 
 -- Mana Tide Totem
@@ -33,14 +34,14 @@ LCT_SpellData[16190] = {
   cooldown = 300,
   class = "SHAMAN",
   talent = true,
-  specID = { SPEC_SHAMAN_RESTORATION },
+  specID = { SPEC_SHAMAN_ELEMENTAL, SPEC_SHAMAN_ENHANCEMENT, SPEC_SHAMAN_RESTORATION },
+  talentSpecID = SPEC_SHAMAN_RESTORATION,
 }
 
 -- Fire Elemental Totem
 LCT_SpellData[2894] = {
   cooldown = 600,
   class = "SHAMAN",
-  specID = { SPEC_SHAMAN_ELEMENTAL },
 }
 
 -- Grounding Totem
@@ -96,7 +97,8 @@ LCT_SpellData[16166] = {
   cooldown = 180,
   class = "SHAMAN",
   talent = true,
-  specID = { SPEC_SHAMAN_ELEMENTAL },
+  specID = { SPEC_SHAMAN_ELEMENTAL, SPEC_SHAMAN_ENHANCEMENT, SPEC_SHAMAN_RESTORATION },
+  talentSpecID = SPEC_SHAMAN_ELEMENTAL,
 }
 
 -- Heroism
@@ -121,14 +123,14 @@ LCT_SpellData[17364] = {
   class = "SHAMAN",
   cooldown = 8,
   talent = true,
-  specID = { SPEC_SHAMAN_ENHANCEMENT },
+  specID = { SPEC_SHAMAN_ELEMENTAL, SPEC_SHAMAN_ENHANCEMENT, SPEC_SHAMAN_RESTORATION },
+  talentSpecID = SPEC_SHAMAN_ENHANCEMENT,
 }
 
 -- Chain Lightning
 LCT_SpellData[421] = {
   cooldown = 6,
   class = "SHAMAN",
-  specID = { SPEC_SHAMAN_ELEMENTAL },
 }
 LCT_SpellData[930] = 421
 LCT_SpellData[2860] = 421
@@ -192,6 +194,10 @@ LCT_SpellData[59159] = {
   specID = { SPEC_SHAMAN_ELEMENTAL },
 }
 
+LCT_SpellData[51490] = 59159
+LCT_SpellData[59156] = 59159
+LCT_SpellData[59158] = 59159
+
 -- Hex
 LCT_SpellData[51514] = {
   class = "SHAMAN",
@@ -214,3 +220,24 @@ LCT_SpellData[51533] = {
 }
 
 -- TODO Nature's Guardian (is there an event?)
+
+-- Additional pet cooldowns (original 3.3.5a Spell/SkillLineAbility data).
+
+-- Bash
+LCT_SpellData[58861] = {
+  class = "SHAMAN",
+  cooldown = 45,
+  pet = true,
+  duration = 2,
+  stun = true,
+  specID = { SPEC_SHAMAN_ENHANCEMENT },
+}
+
+-- Spirit Walk
+LCT_SpellData[58875] = {
+  class = "SHAMAN",
+  cooldown = 32,
+  pet = true,
+  duration = 15,
+  specID = { SPEC_SHAMAN_ENHANCEMENT },
+}
