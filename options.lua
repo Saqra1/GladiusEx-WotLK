@@ -619,20 +619,18 @@ function GladiusEx:SetupOptions()
                     desc = L["Unit race"],
                     get = function() return self.db.base.testUnits[unit].unitRace end,
                     set = function(info, value)
-						print(value)
                         self.db.base.testUnits[unit].unitRace = value
                         self:UpdateFrames()
                     end,
                     values = {
                         ["Human"] = L["Human"],
                         ["Orc"] = L["Orc"],
-                        ["Dward"] = L["Dwarf"],
+                        ["Dwarf"] = L["Dwarf"],
                         ["NightElf"] = L["Night Elf"],
                         ["Undead"] = L["Undead"],
                         ["Tauren"] = L["Tauren"],
                         ["Gnome"] = L["Gnome"],
                         ["Troll"] = L["Troll"],
-                        ["Goblin"] = L["Goblin"],
                         ["BloodElf"] = L["Blood Elf"],
                         ["Draenei"] = L["Draenei"],
                     },
@@ -658,7 +656,6 @@ function GladiusEx:SetupOptions()
                         ["DRUID"] = L["DRUID"],
                         ["PALADIN"] = L["PALADIN"],
                         ["MAGE"] = L["MAGE"],
-                        ["MONK"] = L["MONK"]
                     },                   
                 },
                 spec = {
@@ -677,7 +674,6 @@ function GladiusEx:SetupOptions()
                         [252] = L["specID:252"],
                         [102] = L["specID:102"],
                         [103] = L["specID:103"],
-                        [104] = L["specID:104"],
                         [105] = L["specID:105"],
                         [253] = L["specID:253"],
                         [254] = L["specID:254"],
@@ -720,7 +716,6 @@ function GladiusEx:SetupOptions()
                         [1] = RAGE,
                         [2] = FOCUS,
                         [3] = ENERGY,
-                        [4] = CHI,
                         [6] = RUNIC_POWER,
                     },
                 },

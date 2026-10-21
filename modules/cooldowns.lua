@@ -471,6 +471,8 @@ local function GetUnitInfo(unit)
         specID = GladiusEx.testing[unit].specID
         class = GladiusEx.testing[unit].unitClass
         race = GladiusEx.testing[unit].unitRace
+        -- Test settings use the display name; racial cooldowns use UnitRace's token.
+        if race == "Undead" then race = "Scourge" end
     elseif GladiusEx.buttons[unit] then
         specID = GladiusEx.buttons[unit].specID
         class = select(2, UnitClass(unit)) or GladiusEx.buttons[unit].class
