@@ -332,10 +332,10 @@ function ClassIcon:UNIT_MODEL_CHANGED(event,unit)
     self:UpdateAura(unit)
 end
 
-function ClassIcon:handle_aura(unit, name, best_priority)
-    local prio = self:GetImportantAura(unit, name)
+function ClassIcon:handle_aura(unit, name, best_priority, spellid)
+    local prio = self:GetImportantAura(unit, name, spellid)
         
-    if prio and prio >= best_priority then
+    if prio and prio > 0 and prio >= best_priority then
         return true, prio
     else
         return false, nil
@@ -351,7 +351,7 @@ function ClassIcon:ScanAuras(unit)
     for index = 1, 40 do
         local name,_, icon, _, _, duration, expires, _, _, _, spellid = UnitAura(unit, index, "HARMFUL")
         if not name then break end
-        local prio = self:GetImportantAura(unit, name) or self:GetImportantAura(unit, spellid)
+        local prio = self:GetImportantAura(unit, name, spellid)
         if prio and prio > best_priority or (prio == best_priority and best_expires and expires > best_expires) then
             best_name, best_icon, best_duration, best_expires, best_priority = name, icon, duration, expires, prio
         end
@@ -361,7 +361,7 @@ function ClassIcon:ScanAuras(unit)
     for index = 1, 40 do
         local name,_, icon, _, _, duration, expires, _, _, _, spellid = UnitAura(unit, index, "HELPFUL")
         if not name then break end
-        local prio = self:GetImportantAura(unit, name) or self:GetImportantAura(unit, spellid)
+        local prio = self:GetImportantAura(unit, name, spellid)
         -- V: make sure we have a best_expires before comparing it
         if prio and prio > best_priority or (prio == best_priority and best_expires and expires > best_expires) then
             best_name, best_icon, best_duration, best_expires, best_priority = name, icon, duration, expires, prio
@@ -618,12 +618,34 @@ end
 function ClassIcon:Test(unit)
 end
 
-function ClassIcon:GetImportantAura(unit, name)
-    return self.db[unit].classIconAuras[name]
+function ClassIcon:GetImportantAura(unit, name, spellid)
+    local auras = self.db[unit].classIconAuras
+    local priority = spellid and auras[spellid]
+    -- Exact IDs override names, including priority 0. A deleted ID rule (false)
+    -- falls back to the name; keep false values in the profile for AceDB.
+    if type(priority) == "number" then return priority end
+    return auras[name]
 end
 
-local function HasAuraEditBox()
-    return not not LibStub("AceGUI-3.0").WidgetVersions["Aura_EditBox"]
+local function ParseAura(value)
+    value = value:match("^%s*(.-)%s*$")
+    if value == "" then return nil end
+    local id = tonumber(value)
+    if id then
+        if id > 0 and id < math.huge and id % 1 == 0 then return id end
+        return nil
+    end
+    return GetSpellInfo(value) or value
+end
+
+local function ValidateAura(info, value)
+    return ParseAura(value) ~= nil or L["Enter a spell name or a positive whole spell ID."]
+end
+
+local function AuraOptionKey(aura)
+    -- AceConfig requires string keys; keep numeric IDs distinct from saved names
+    -- and from the newAura controls, without changing the profile's keys.
+    return type(aura) .. ":" .. tostring(aura)
 end
 
 function ClassIcon:GetOptions(unit)
@@ -744,6 +766,11 @@ function ClassIcon:GetOptions(unit)
             childGroups = "tree",
             order = 3,
             args = {
+                matching = {
+                    type = "description",
+                    name = L["Names match all ranks and effects with that name. Numeric IDs match only that exact spell and override name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."],
+                    order = 0,
+                },
                 newAura = {
                     type = "group",
                     name = L["New aura"],
@@ -753,11 +780,12 @@ function ClassIcon:GetOptions(unit)
                     args = {
                         name = {
                             type = "input",
-                            dialogControl = HasAuraEditBox() and "Aura_EditBox" or nil,
-                            name = L["Name"],
-                            desc = L["Name of the aura"],
-                            get = function() return self.newAuraName or "" end,
-                            set = function(info, value) self.newAuraName = GetSpellInfo(value) or value end,
+                            -- Spell completion widgets can replace an ID with its name.
+                            name = L["Spell name or ID"],
+                            desc = L["Enter an aura name or an exact numeric spell ID."],
+                            validate = ValidateAura,
+                            get = function() return self.newAuraName and tostring(self.newAuraName) or "" end,
+                            set = function(info, value) self.newAuraName = ParseAura(value) end,
                             disabled = function() return not self:IsUnitEnabled(unit) end,
                             order = 1,
                         },
@@ -777,8 +805,9 @@ function ClassIcon:GetOptions(unit)
                             type = "execute",
                             name = L["Add new aura"],
                             func = function(info)
+                                if not self.newAuraName or not self.newAuraPriority then return end
                                 self.db[unit].classIconAuras[self.newAuraName] = self.newAuraPriority
-                                options.auraList.args[self.newAuraName] = self:SetupAuraOptions(options, unit, self.newAuraName)
+                                options.auraList.args[AuraOptionKey(self.newAuraName)] = self:SetupAuraOptions(options, unit, self.newAuraName)
                                 self.newAuraName = nil
                                 GladiusEx:UpdateFrames()
                             end,
@@ -797,7 +826,7 @@ function ClassIcon:GetOptions(unit)
     -- setup auras
     for aura, priority in pairs(self.db[unit].classIconAuras) do
         if priority then
-            options.auraList.args[aura] = self:SetupAuraOptions(options, unit, aura)
+            options.auraList.args[AuraOptionKey(aura)] = self:SetupAuraOptions(options, unit, aura)
         end
     end
 
@@ -807,18 +836,18 @@ end
 function ClassIcon:SetupAuraOptions(options, unit, aura)
     local function setAura(info, value)
         if (info[#(info)] == "name") then
-            local old_name = info[#(info) - 1]
-            if old_name == value then return end
+            value = ParseAura(value)
+            if not value or aura == value then return end
 
             -- create new aura
-            self.db[unit].classIconAuras[value] = self.db[unit].classIconAuras[old_name]
-            options.auraList.args[value] = self:SetupAuraOptions(options, unit, value)
+            self.db[unit].classIconAuras[value] = self.db[unit].classIconAuras[aura]
+            options.auraList.args[AuraOptionKey(value)] = self:SetupAuraOptions(options, unit, value)
 
             -- Keep an explicit override so AceDB does not restore the default.
-            self.db[unit].classIconAuras[old_name] = false
-            options.auraList.args[old_name] = nil
+            self.db[unit].classIconAuras[aura] = false
+            options.auraList.args[AuraOptionKey(aura)] = nil
         else
-            self.db[unit].classIconAuras[info[#(info) - 1]] = value
+            self.db[unit].classIconAuras[aura] = value
         end
 
         GladiusEx:UpdateFrames()
@@ -826,25 +855,29 @@ function ClassIcon:SetupAuraOptions(options, unit, aura)
 
     local function getAura(info)
         if (info[#(info)] == "name") then
-            return info[#(info) - 1]
+            return tostring(aura)
         else
-            return self.db[unit].classIconAuras[info[#(info) - 1]]
+            return self.db[unit].classIconAuras[aura]
         end
     end
 
+    local label = aura
+    if type(aura) == "number" then
+        label = (GetSpellInfo(aura) or L["Spell ID"]) .. " (" .. aura .. ")"
+    end
     return {
         type = "group",
-        name = aura,
-        desc = aura,
+        name = label,
+        desc = label,
         get = getAura,
         set = setAura,
         disabled = function() return not self:IsUnitEnabled(unit) end,
         args = {
             name = {
                 type = "input",
-                dialogControl = HasAuraEditBox() and "Aura_EditBox" or nil,
-                name = L["Name"],
-                desc = L["Name of the aura"],
+                name = L["Spell name or ID"],
+                desc = L["Enter an aura name or an exact numeric spell ID."],
+                validate = ValidateAura,
                 disabled = function() return not self:IsUnitEnabled(unit) end,
                 order = 1,
             },
@@ -859,10 +892,9 @@ function ClassIcon:SetupAuraOptions(options, unit, aura)
                 type = "execute",
                 name = L["Delete"],
                 func = function(info)
-                    local aura = info[#(info) - 1]
                     -- nil would allow AceDB to restore a default aura on reload.
                     self.db[unit].classIconAuras[aura] = false
-                    options.auraList.args[aura] = nil
+                    options.auraList.args[AuraOptionKey(aura)] = nil
                     GladiusEx:UpdateFrames()
                 end,
                 disabled = function() return not self:IsUnitEnabled(unit) end,

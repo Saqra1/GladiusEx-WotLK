@@ -4,6 +4,18 @@
 local modulePath = arg[1] or "modules/classicon.lua"
 local cases = 0
 
+-- Verified in Spell.dbc: horror/disarm, sleep/DoT, backlash/DoT, instant/haste.
+local sameNameEffects = {
+    {name = "Psychic Horror", filter = "HARMFUL", ids = {64044, 64058}},
+    {name = "Wyvern Sting", filter = "HARMFUL", ids = {49012, 49010, 19386, 24131}},
+    {name = "Unstable Affliction", filter = "HARMFUL", ids = {31117, 47843, 30108, 43523}},
+    {name = "Elemental Mastery", filter = "HELPFUL", ids = {16166, 64701}},
+}
+local effectNames = {}
+for _, effect in ipairs(sameNameEffects) do
+    for _, id in ipairs(effect.ids) do effectNames[id] = effect.name end
+end
+
 local function equal(actual, expected, context)
     assert(actual == expected, context .. ": expected " .. tostring(expected) ..
         ", got " .. tostring(actual))
@@ -27,7 +39,10 @@ local function setup(saved)
     UnitFactionGroup = function() return "Alliance" end
     GetTime = function() return 100 end
     GetSpellInfo = function(id)
-        if type(id) == "number" then return "Spell " .. id end
+        if type(id) == "number" then
+            if id == 999999 then return nil end -- Unknown/custom server ID.
+            return effectNames[id] or "Spell " .. id
+        end
     end
     geterrorhandler = function() return error end
     CreateFrame = function()
@@ -42,12 +57,14 @@ local function setup(saved)
     UnitAura = function(unit, index, filter)
         local aura = state.auras[filter][index]
         if aura then
-            return aura.name, "", "icon", 1, nil, 10, 110, "player", nil, nil, aura.id
+            return aura.name, "", aura.icon or "icon:" .. tostring(aura.id), 1, nil,
+                aura.duration or 10, aura.expires or 110, "player", nil, nil, aura.id
         end
     end
     loadFile("libs/LibStub/LibStub.lua")
     loadFile("libs/CallbackHandler-1.0/CallbackHandler-1.0.lua")
     loadFile("libs/AceDB-3.0/AceDB-3.0.lua")
+    loadFile("libs/AceConfig-3.0/AceConfigRegistry-3.0/AceConfigRegistry-3.0.lua")
     loadFile("libs/LibFunctional-1.0/functional.lua")
 
     local modules = {}
@@ -69,7 +86,8 @@ local function setup(saved)
     LibStub:NewLibrary("AceLocale-3.0", 1).GetLocale = function() return locale end
     LibStub:NewLibrary("LibSharedMedia-3.0", 1)
     LibStub:NewLibrary("LibSpecDetection-1.0", 1)
-    LibStub:NewLibrary("AceGUI-3.0", 1).WidgetVersions = {}
+    -- An optional completion widget must not get the chance to erase exact IDs.
+    LibStub:NewLibrary("AceGUI-3.0", 1).WidgetVersions = {Aura_EditBox = 1}
     loadFile("GladiusEx.lua")
     loadFile(modulePath)
     addon.UpdateFrames = noop
@@ -105,9 +123,19 @@ local function reload(state)
     return setup(assert(loadstring("return " .. saved))())
 end
 
+local function optionKey(aura)
+    return type(aura) .. ":" .. tostring(aura)
+end
+
+local function validateOptions(options)
+    LibStub("AceConfigRegistry-3.0"):ValidateOptionsTable({
+        type = "group", name = "ClassIcon", args = options,
+    }, "ClassIcon")
+end
+
 local function remove(module, options, name)
-    options.auraList.args[name].args.delete.func({"auraList", name, "delete"})
-    equal(options.auraList.args[name], nil, "deleted option removed immediately")
+    options.auraList.args[optionKey(name)].args.delete.func({"auraList", optionKey(name), "delete"})
+    equal(options.auraList.args[optionKey(name)], nil, "deleted option removed immediately")
 end
 
 local function add(options, name, priority)
@@ -137,7 +165,7 @@ for _, unit in ipairs({"arena", "party"}) do
         for session = 1, 3 do
             state = reload(state)
             module = state.module
-            equal(module:GetOptions(unit).auraList.args[name], nil, "deleted option after reload")
+            equal(module:GetOptions(unit).auraList.args[optionKey(name)], nil, "deleted option after reload")
             equal(module:GetImportantAura(unit, name), false, "saved deletion after reload")
             equal(module.db[other].classIconAuras[name], default, "other configuration after reload")
             equal(module.defaults_arena.classIconAuras[name], default, "arena defaults unchanged")
@@ -156,15 +184,15 @@ for _, unit in ipairs({"arena", "party"}) do
         remove(module, options, defaultName)
         state = reload(state)
         module, options = state.module, state.module:GetOptions(unit)
-        equal(options.auraList.args[name], nil, "custom deletion after reload")
-        equal(options.auraList.args[defaultName], nil, "default deletion after reload")
+        equal(options.auraList.args[optionKey(name)], nil, "custom deletion after reload")
+        equal(options.auraList.args[optionKey(defaultName)], nil, "default deletion after reload")
         add(options, name, 3.1)
         add(options, defaultName, 6.3)
         state = reload(state)
         module, options = state.module, state.module:GetOptions(unit)
         equal(module:GetImportantAura(unit, name), 3.1, "custom re-add after reload")
         equal(module:GetImportantAura(unit, defaultName), 6.3, "default re-add after reload")
-        assert(options.auraList.args[name] and options.auraList.args[defaultName])
+        assert(options.auraList.args[optionKey(name)] and options.auraList.args[optionKey(defaultName)])
     end)
 
     test(unit .. ": priority edits preserve deletions and unrelated settings", function()
@@ -175,13 +203,13 @@ for _, unit in ipairs({"arena", "party"}) do
         module.db[unit].classIconMode = "PORTRAIT2D"
         module.db[unit].classIconGlossColor.r = 0.25
         remove(module, options, deleted)
-        options.auraList.args[name].set({"auraList", name, "priority"}, 4.7)
+        options.auraList.args[optionKey(name)].set({"auraList", optionKey(name), "priority"}, 4.7)
         local zero = state.addon:SafeGetSpellName(1715)
-        assert(module:GetOptions(unit).auraList.args[zero], "zero priority remains editable")
+        assert(module:GetOptions(unit).auraList.args[optionKey(zero)], "zero priority remains editable")
         state = reload(state)
         module = state.module
         equal(module:GetImportantAura(unit, name), 4.7, "edited priority after reload")
-        equal(module:GetOptions(unit).auraList.args[deleted], nil, "deletion retained")
+        equal(module:GetOptions(unit).auraList.args[optionKey(deleted)], nil, "deletion retained")
         equal(module.db[unit].classIconMode, "PORTRAIT2D", "icon mode retained")
         equal(module.db[unit].classIconGlossColor.r, 0.25, "color retained")
         equal(module.db[other].classIconGlossColor.r, 1, "other configuration color unchanged")
@@ -193,12 +221,12 @@ for _, unit in ipairs({"arena", "party"}) do
         local options = module:GetOptions(unit)
         local name = state.addon:SafeGetSpellName(118)
         local priority = module:GetImportantAura(unit, name)
-        options.auraList.args[name].set({"auraList", name, "name"}, "Renamed Aura")
+        options.auraList.args[optionKey(name)].set({"auraList", optionKey(name), "name"}, "Renamed Aura")
         state = reload(state)
         module, options = state.module, state.module:GetOptions(unit)
-        equal(options.auraList.args[name], nil, "old name remains deleted")
+        equal(options.auraList.args[optionKey(name)], nil, "old name remains deleted")
         equal(module:GetImportantAura(unit, "Renamed Aura"), priority, "renamed priority")
-        options.auraList.args["Renamed Aura"].set({"auraList", "Renamed Aura", "name"}, "Renamed Aura")
+        options.auraList.args[optionKey("Renamed Aura")].set({"auraList", optionKey("Renamed Aura"), "name"}, "Renamed Aura")
         equal(module:GetImportantAura(unit, "Renamed Aura"), priority, "unchanged name preserves aura")
     end)
 
@@ -221,6 +249,176 @@ for _, unit in ipairs({"arena", "party"}) do
             state.auras[filter] = {}
         end
     end)
+
+    test(unit .. ": exact IDs distinguish effects and override shared names", function()
+        local state = setup()
+        local module, options = state.module, state.module:GetOptions(unit)
+        local combatUnit = unit .. "1"
+        for _, effect in ipairs(sameNameEffects) do
+            add(options, effect.name, 8)
+            add(options, tostring(effect.ids[1]), 3)
+            add(options, tostring(effect.ids[2]), 0)
+        end
+        state = reload(state)
+        module = state.module
+        for _, effect in ipairs(sameNameEffects) do
+            for index, id in ipairs(effect.ids) do
+                local priority = index == 1 and 3 or index == 2 and 0 or 8
+                equal(module:GetImportantAura(combatUnit, effect.name, id), priority, "exact ID before name")
+                state.auras[effect.filter] = {{name = effect.name, id = id}}
+                equal(module:ScanAuras(combatUnit), priority > 0 and effect.name or nil, "scan " .. id)
+                local accepted, actual = module:handle_aura(combatUnit, effect.name, 0, id)
+                equal(accepted, priority > 0, "single aura uses same precedence")
+                equal(actual, priority > 0 and priority or nil, "single aura priority")
+            end
+            state.auras[effect.filter] = {
+                {name = effect.name, id = effect.ids[2], expires = 999},
+                {name = effect.name, id = effect.ids[1], expires = 111},
+            }
+            local _, icon, _, expires = module:ScanAuras(combatUnit)
+            equal(icon, "icon:" .. effect.ids[1], "same-name effect selects exact icon")
+            equal(expires, 111, "same-name effect selects exact expiration")
+            -- A lowered ID priority must also lose to a different aura.
+            add(module:GetOptions(unit), "Competing Aura", 5)
+            state.auras[effect.filter] = {
+                {name = effect.name, id = effect.ids[1]},
+                {name = "Competing Aura", id = 99998},
+            }
+            equal(module:ScanAuras(combatUnit), "Competing Aura", "ID priority determines winner")
+            state.auras[effect.filter] = {{name = effect.name}} -- No spell ID available.
+            equal(module:ScanAuras(combatUnit), effect.name, "missing ID retains name fallback")
+            equal(module:GetImportantAura(other, effect.ids[1]), nil, "other group has no exact rule")
+            state.auras[effect.filter] = {}
+        end
+        validateOptions(module:GetOptions(unit))
+    end)
+
+    test(unit .. ": adding, editing, renaming and deleting IDs survive reloads", function()
+        local state = setup()
+        local module, options = state.module, state.module:GetOptions(unit)
+        local name = "Psychic Horror"
+        local namePriority = module:GetImportantAura(unit, name)
+        add(options, " 064044 ", 4.2)
+        local group = options.auraList.args[optionKey(64044)]
+        equal(group.name, "Psychic Horror (64044)", "readable ID label")
+        equal(group.get({"auraList", optionKey(64044), "name"}), "64044", "input retains numeric ID")
+        equal(options.auraList.args.newAura.args.name.get({}), "", "add clears input")
+        equal(group.args.name.dialogControl, nil, "ID editing bypasses name completion")
+        equal(options.auraList.args.newAura.args.name.dialogControl, nil, "ID creation bypasses name completion")
+        validateOptions(options)
+        for session = 1, 3 do
+            state = reload(state)
+            module, options = state.module, state.module:GetOptions(unit)
+            equal(module:GetImportantAura(unit, 64044), 4.2, "numeric SavedVariables key retained")
+            equal(module:GetImportantAura(unit, "64044"), nil, "no numeric string key created")
+            equal(module:GetImportantAura(unit, name), namePriority, "name customization preserved")
+            equal(module:GetImportantAura(other, 64044), nil, "other group unchanged")
+            validateOptions(options)
+        end
+        group = options.auraList.args[optionKey(64044)]
+        group.set({"auraList", optionKey(64044), "priority"}, 6.4)
+        group.set({"auraList", optionKey(64044), "name"}, "064044")
+        equal(module:GetImportantAura(unit, 64044), 6.4, "normalized unchanged ID is not deleted")
+        state = reload(state)
+        module, options = state.module, state.module:GetOptions(unit)
+        equal(module:GetImportantAura(unit, 64044), 6.4, "priority edit after reload")
+        options.auraList.args[optionKey(64044)].set({"auraList", optionKey(64044), "name"}, "64058")
+        equal(options.auraList.args[optionKey(64044)], nil, "renamed ID removed immediately")
+        state = reload(state)
+        module, options = state.module, state.module:GetOptions(unit)
+        equal(module:GetImportantAura(unit, 64044), false, "old ID deletion persisted")
+        equal(module:GetImportantAura(unit, name, 64044), namePriority, "deleted ID falls back to name")
+        equal(module:GetImportantAura(unit, 64058), 6.4, "new ID keeps priority")
+        remove(module, options, 64058)
+        for session = 1, 3 do
+            state = reload(state)
+            module, options = state.module, state.module:GetOptions(unit)
+            equal(options.auraList.args[optionKey(64058)], nil, "deleted ID absent after reload")
+            equal(module:GetImportantAura(unit, 64058), false, "ID tombstone retained")
+            equal(module:GetImportantAura(unit, name, 64058), namePriority, "deletion restores name rule")
+        end
+        add(options, "64058", 0)
+        state = reload(state)
+        module = state.module
+        equal(module:GetImportantAura(unit, name, 64058), 0, "re-added zero overrides name after reload")
+        equal(module:GetImportantAura(unit, name, 64044), namePriority, "other effect still matches name")
+        assert(module:GetOptions(unit).auraList.args[optionKey(64058)], "zero ID remains editable")
+    end)
+
+    test(unit .. ": name rules can become exact IDs and return to names", function()
+        local state = setup()
+        local module, options = state.module, state.module:GetOptions(unit)
+        local name, id, sibling = "Psychic Horror", 64044, 64058
+        local priority = module:GetImportantAura(unit, name)
+        options.auraList.args[optionKey(name)].set({"auraList", optionKey(name), "name"}, tostring(id))
+        state = reload(state)
+        module, options = state.module, state.module:GetOptions(unit)
+        equal(module:GetImportantAura(unit, name), false, "default name stays deleted")
+        equal(module:GetImportantAura(unit, name, id), priority, "exact ID works despite name deletion")
+        equal(module:GetImportantAura(unit, name, sibling), false, "same-name sibling stays untracked")
+        for _, filter in ipairs({"HARMFUL", "HELPFUL"}) do
+            state.auras[filter] = {{name = name, id = sibling}}
+            equal(module:ScanAuras(unit .. "1"), nil, "sibling ignored in " .. filter)
+            state.auras[filter] = {{name = name, id = id}}
+            equal(module:ScanAuras(unit .. "1"), name, "exact effect matched in " .. filter)
+            state.auras[filter] = {}
+        end
+        options.auraList.args[optionKey(id)].set({"auraList", optionKey(id), "name"}, name)
+        state = reload(state)
+        module = state.module
+        equal(module:GetImportantAura(unit, id), false, "old exact rule deleted")
+        equal(module:GetImportantAura(unit, name, id), priority, "restored name matches original ID")
+        equal(module:GetImportantAura(unit, name, sibling), priority, "restored name matches sibling")
+    end)
+
+    test(unit .. ": saved numeric and name keys coexist in valid settings", function()
+        local state = setup()
+        local auras = state.module.db[unit].classIconAuras
+        auras[64044], auras["64044"], auras.newAura, auras.matching = 4, 2, 3, 6
+        state = reload(state)
+        local module, options = state.module, state.module:GetOptions(unit)
+        validateOptions(options)
+        for aura, priority in pairs({[64044] = 4, ["64044"] = 2, newAura = 3, matching = 6}) do
+            local group = options.auraList.args[optionKey(aura)]
+            assert(group, "saved rule has separate controls")
+            equal(group.get({"auraList", optionKey(aura), "priority"}), priority, "saved rule editable")
+            group.set({"auraList", optionKey(aura), "priority"}, priority + 1)
+        end
+        state = reload(state)
+        module = state.module
+        equal(module:GetImportantAura(unit, 64044), 5, "numeric rule edited")
+        equal(module:GetImportantAura(unit, "64044"), 3, "legacy string key preserved")
+        equal(module:GetImportantAura(unit, "newAura"), 4, "control-name collision preserved")
+        equal(module:GetImportantAura(unit, "matching"), 7, "description-name collision preserved")
+        remove(module, module:GetOptions(unit), "64044")
+        state = reload(state)
+        equal(state.module:GetImportantAura(unit, "64044"), false, "legacy string deletion persists")
+        equal(state.module:GetImportantAura(unit, 64044), 5, "legacy string deletion keeps exact ID")
+    end)
+
+    test(unit .. ": invalid input is rejected and unknown IDs remain editable", function()
+        local state = setup()
+        local module, options = state.module, state.module:GetOptions(unit)
+        local input = options.auraList.args.newAura.args
+        for _, value in ipairs({"", "   ", "0", "-1", "64044.5", "1e999"}) do
+            assert(input.name.validate({}, value) ~= true, "reject invalid aura: " .. value)
+            input.name.set({}, value)
+            assert(input.add.disabled(), "cannot add invalid aura")
+            input.add.func({}) -- No mutation even if invoked while disabled.
+        end
+        assert(input.name.validate({}, "Custom Aura") == true, "unknown names remain supported")
+        add(options, "999999", 2)
+        local group = options.auraList.args[optionKey(999999)]
+        equal(group.name, "Spell ID (999999)", "unknown ID has fallback label")
+        for _, value in ipairs({"", "0", "-1", "1.5"}) do
+            assert(group.args.name.validate({}, value) ~= true, "invalid edit rejected")
+            group.set({"auraList", optionKey(999999), "name"}, value)
+            equal(module:GetImportantAura(unit, 999999), 2, "invalid edit preserves original")
+        end
+        state = reload(state)
+        equal(state.module:GetImportantAura(unit, 999999), 2, "unknown numeric ID persists")
+        validateOptions(state.module:GetOptions(unit))
+    end)
 end
 
 test("profile switches keep arena and party edits isolated", function()
@@ -236,17 +434,59 @@ test("profile switches keep arena and party edits isolated", function()
     remove(module, module:GetOptions("party"), partyName)
     add(module:GetOptions("arena"), "Other Aura", 4)
     state.addon.dbi:SetProfile("Default")
-    equal(module:GetOptions("arena").auraList.args[arenaName], nil, "original arena deletion retained")
+    equal(module:GetOptions("arena").auraList.args[optionKey(arenaName)], nil, "original arena deletion retained")
     equal(module:GetImportantAura("party", partyName), partyDefault, "other profile party deletion isolated")
     equal(module:GetImportantAura("party", "Profile Aura"), 2, "original custom aura retained")
     equal(module:GetImportantAura("arena", "Other Aura"), nil, "other profile custom aura isolated")
     state = reload(state)
     module = state.module
-    equal(module:GetOptions("arena").auraList.args[arenaName], nil, "profile deletion after reload")
+    equal(module:GetOptions("arena").auraList.args[optionKey(arenaName)], nil, "profile deletion after reload")
     state.addon.dbi:SetProfile("Other")
     equal(module:GetImportantAura("arena", arenaName), arenaDefault, "other profile arena after reload")
-    equal(module:GetOptions("party").auraList.args[partyName], nil, "other profile deletion after reload")
+    equal(module:GetOptions("party").auraList.args[optionKey(partyName)], nil, "other profile deletion after reload")
     equal(module:GetImportantAura("arena", "Other Aura"), 4, "other profile custom after reload")
+end)
+
+test("ID rules follow profile switches, copies and resets for both groups", function()
+    local state = setup()
+    local module = state.module
+    add(module:GetOptions("arena"), "64044", 3)
+    add(module:GetOptions("party"), "64044", 7)
+    add(module:GetOptions("party"), "64058", 0)
+    state.addon.dbi:SetProfile("Other")
+    equal(module:GetImportantAura("arena", 64044), nil, "fresh arena profile has no ID rule")
+    equal(module:GetImportantAura("party", 64044), nil, "fresh party profile has no ID rule")
+    add(module:GetOptions("arena"), "64044", 8)
+    add(module:GetOptions("party"), "64044", 1)
+    state.addon.dbi:SetProfile("Default")
+    equal(module:GetImportantAura("arena1", "Psychic Horror", 64044), 3, "original arena ID rule")
+    equal(module:GetImportantAura("party1", "Psychic Horror", 64044), 7, "original party ID rule")
+    equal(module:GetImportantAura("party1", "Psychic Horror", 64058), 0, "original party suppression")
+    state.addon.dbi:SetProfile("Copy")
+    state.addon.dbi:CopyProfile("Default")
+    equal(module:GetImportantAura("arena", 64044), 3, "arena ID copied")
+    equal(module:GetImportantAura("party", 64044), 7, "party ID copied")
+    equal(module:GetImportantAura("party", 64058), 0, "zero ID copied")
+    remove(module, module:GetOptions("party"), 64044)
+    state = reload(state)
+    module = state.module
+    equal(module:GetImportantAura("party", 64044), false, "copied profile deletion persists")
+    equal(module:GetImportantAura("arena", 64044), 3, "copy arena remains independent")
+    state.addon.dbi:ResetProfile()
+    equal(module:GetImportantAura("arena", 64044), nil, "reset clears arena ID rule")
+    equal(module:GetImportantAura("party", 64058), nil, "reset clears party ID rule")
+    equal(module:GetImportantAura("party", "Psychic Horror", 64058), 9, "reset restores name fallback")
+    state = reload(state)
+    module = state.module
+    state.addon.dbi:SetProfile("Default")
+    equal(module:GetImportantAura("arena", 64044), 3, "source arena survives copy/reset/reload")
+    equal(module:GetImportantAura("party", 64044), 7, "source party survives copy/reset/reload")
+    equal(module:GetImportantAura("party", 64058), 0, "source suppression survives copy/reset/reload")
+    state.addon.dbi:SetProfile("Other")
+    equal(module:GetImportantAura("arena", 64044), 8, "other arena profile remains distinct")
+    equal(module:GetImportantAura("party", 64044), 1, "other party profile remains distinct")
+    validateOptions(module:GetOptions("arena"))
+    validateOptions(module:GetOptions("party"))
 end)
 
 print("Passed " .. cases .. " Important Auras tests")
