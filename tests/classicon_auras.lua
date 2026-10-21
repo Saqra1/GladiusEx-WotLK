@@ -20,6 +20,12 @@ local newDebuffs = {
     [55080] = "Shattered Barrier", [58373] = "Glyph of Hamstring",
 }
 local auraAliases = {[53562] = "Ravage", [64701] = "Elemental Mastery"}
+local castNames = {
+    [2060] = "Greater Heal", [8936] = "Regrowth", [50464] = "Nourish",
+    [118] = "Polymorph", [12826] = "Polymorph", [5782] = "Fear", [51514] = "Hex",
+    [20066] = "Repentance", [33786] = "Cyclone", [1513] = "Scare Beast",
+    [339] = "Entangling Roots", [2637] = "Hibernate",
+}
 -- Verified in Spell.dbc: horror/disarm, sleep/DoT, backlash/DoT, instant/haste.
 local sameNameEffects = {
     {name = "Psychic Horror", filter = "HARMFUL", ids = {64044, 64058}},
@@ -66,7 +72,7 @@ local function setup(saved, spellModules)
     GetSpellInfo = function(id)
         if type(id) == "number" then
             if id == 999999 then return nil end -- Unknown/custom server ID.
-            return newBuffs[id] or newDebuffs[id] or auraAliases[id] or effectNames[id] or "Spell " .. id
+            return newBuffs[id] or newDebuffs[id] or auraAliases[id] or castNames[id] or effectNames[id] or "Spell " .. id
         end
     end
     geterrorhandler = function() return error end

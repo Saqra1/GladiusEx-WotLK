@@ -30,7 +30,22 @@ end
 local function saveDetails(profile, field, spell, name, id)
     profile.spellRuleDetails = profile.spellRuleDetails or {}
     profile.spellRuleDetails[field] = profile.spellRuleDetails[field] or {}
-    profile.spellRuleDetails[field][spell] = { name = name, spellID = id }
+    profile.spellRuleDetails[field][spell] = { name = name, spellID = id or false }
+end
+
+local function deleteRule(module, unit, field, spell)
+    local profile = module.db[unit]
+    local defaults = module.dbi_arena.profile == profile and module.defaults_arena or module.defaults_party
+    local default = defaults[field] and defaults[field][spell]
+    profile[field][spell] = type(default) == "table" and {disabled = true} or false
+end
+
+function GladiusEx:SpellRuleID(profile, field, spell)
+    if type(spell) == "number" then return spell end
+    local id = details(profile, field, spell).spellID
+    if id ~= nil then return id end
+    local rule = profile[field][spell]
+    return type(rule) == "table" and rule.spellID or nil
 end
 
 function GladiusEx:SpellRuleName(profile, field, spell)
@@ -41,8 +56,10 @@ end
 function GladiusEx:GetSpellRule(profile, field, name, id)
     local rules = profile[field]
     local exact = id and rules[id]
-    if exact then return exact, id end
-    return rules[name], name
+    if exact and (type(exact) ~= "table" or not exact.disabled) then return exact, id end
+    local rule = rules[name]
+    if type(rule) == "table" and rule.disabled then return false, name end
+    return rule, name
 end
 
 local function idOptions(getName, getID, setID, getCheck, setCheck, disabled)
@@ -124,14 +141,14 @@ end
 function GladiusEx:ConfigureSpellRule(module, unit, field, groups, spell, group, setup, disabled)
     local function name() return self:SpellRuleName(module.db[unit], field, spell) end
     local function id()
-        return type(spell) == "number" and spell or details(module.db[unit], field, spell).spellID
+        return self:SpellRuleID(module.db[unit], field, spell)
     end
     local function move(newSpell, newName, newID)
         local profile = module.db[unit]
         if spell ~= newSpell then
             profile[field][newSpell] = profile[field][spell]
             -- Explicit deletions keep AceDB from restoring default rules.
-            profile[field][spell] = false
+            deleteRule(module, unit, field, spell)
             groups[self:SpellRuleKey(spell)] = nil
             if profile.spellRuleDetails and profile.spellRuleDetails[field] then
                 profile.spellRuleDetails[field][spell] = nil
@@ -175,7 +192,7 @@ function GladiusEx:ConfigureSpellRule(module, unit, field, groups, spell, group,
     group.args.spellID, group.args.checkSpellID = controls.spellID, controls.checkSpellID
     group.args.delete.func = function()
         local profile = module.db[unit]
-        profile[field][spell] = false
+        deleteRule(module, unit, field, spell)
         if profile.spellRuleDetails and profile.spellRuleDetails[field] then
             profile.spellRuleDetails[field][spell] = nil
         end

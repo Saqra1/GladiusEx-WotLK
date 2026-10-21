@@ -297,4 +297,101 @@ test("cast alerts use unit-event and combat-log IDs without guessing ranks", fun
     assert(alerts:IsAlertActive("arena1", key), "channel uses observed ID if combat log arrives first")
 end)
 
+for _, unit in ipairs({"arena", "party"}) do
+    test(unit .. ": every cast preset includes its optional spell ID", function()
+        local state = setup(nil, true)
+        local module, groups = options(state, lists[4], unit)
+        local presets = {
+            [2060] = "Greater Heal", [8936] = "Regrowth", [50464] = "Nourish",
+            [118] = "Polymorph", [5782] = "Fear", [51514] = "Hex", [20066] = "Repentance",
+            [33786] = "Cyclone", [1513] = "Scare Beast", [339] = "Entangling Roots", [2637] = "Hibernate",
+        }
+        for id, name in pairs(presets) do
+            local rule = module.db[unit].castsSpells[name]
+            local controls = group(state, groups, name).args
+            equal(rule.spellID, id, "preset contains the spell ID")
+            equal(controls.spellID.get({}), tostring(id), "preset ID shown in settings")
+            equal(controls.checkSpellID.get({}), false, "preset still matches names")
+            local healing = id == 2060 or id == 8936 or id == 50464
+            equal(rule.priority, healing and 10 or 20, "existing priority retained")
+            equal(rule.color.r, healing and 0 or 1, "existing red retained")
+            equal(rule.color.g, healing and 1 or 0, "existing green retained")
+        end
+        state = reload(state)
+        module, groups = options(state, lists[4], unit)
+        equal(group(state, groups, "Polymorph").args.spellID.get({}), "118", "preset ID available after reload")
+        local original = module.db[unit].castsSpells.Polymorph
+        equal(state.addon:GetSpellRule(module.db[unit], "castsSpells", "Polymorph", 12826), original, "higher rank still matches")
+        group(state, groups, "Polymorph").args.checkSpellID.set({}, true)
+        for session = 1, 3 do
+            state = reload(state)
+            module, groups = options(state, lists[4], unit)
+            equal(groups[state.addon:SpellRuleKey("Polymorph")], nil, "moved preset name stays deleted")
+            equal(group(state, groups, 118).args.checkSpellID.get({}), true, "opt-in exact match saved")
+            equal(state.addon:GetSpellRule(module.db[unit], "castsSpells", "Polymorph", 12826), false, "exact check rejects another rank")
+        end
+        group(state, groups, 118).args.checkSpellID.set({}, false)
+        group(state, groups, "Polymorph").args.spellID.set({}, "")
+        for session = 1, 3 do
+            state = reload(state)
+            module, groups = options(state, lists[4], unit)
+            local controls = group(state, groups, "Polymorph").args
+            equal(controls.spellID.get({}), "", "cleared preset ID stays empty")
+            equal(controls.checkSpellID.get({}), false, "name matching retained after clearing ID")
+        end
+    end)
+
+    test(unit .. ": deleted cast presets stay deleted after IDs are added", function()
+        local state = setup(nil, true)
+        local module, groups = options(state, lists[4], unit)
+        group(state, groups, "Greater Heal").args.delete.func({})
+        for session = 1, 3 do
+            state = reload(state)
+            module, groups = options(state, lists[4], unit)
+            equal(groups[state.addon:SpellRuleKey("Greater Heal")], nil, "deleted preset absent from settings")
+            equal(state.addon:GetSpellRule(module.db[unit], "castsSpells", "Greater Heal", 2060), false, "deleted preset cannot alert")
+        end
+        state.addon.dbi:ResetProfile()
+        module, groups = options(state, lists[4], unit)
+        equal(group(state, groups, "Greater Heal").args.spellID.get({}), "2060", "reset restores preset with ID")
+    end)
+end
+
+test("preset IDs preserve old profiles, explicit IDs and saved deletions", function()
+    local saved = {namespaces = {}}
+    for _, namespace in ipairs({"Alerts", "party_Alerts"}) do
+        saved.namespaces[namespace] = {profiles = {
+            Default = {
+                castsSpells = {
+                    ["Greater Heal"] = false,
+                    Polymorph = {priority = 33, color = {r = 0.1, g = 0.2, b = 0.3, a = 0.4}},
+                    [12826] = {priority = 77, color = {r = 1, g = 1, b = 1, a = 1}},
+                },
+                spellRuleDetails = {castsSpells = {
+                    Polymorph = {spellID = 12826}, Fear = {spellID = false},
+                }},
+            },
+            Other = {castsSpells = {Regrowth = false}},
+        }}
+    end
+    local state = setup(saved, true)
+    for session = 1, 3 do
+        for _, unit in ipairs({"arena", "party"}) do
+            local module, groups = options(state, lists[4], unit)
+            equal(groups[state.addon:SpellRuleKey("Greater Heal")], nil, "legacy deletion retained")
+            equal(state.addon:GetSpellRule(module.db[unit], "castsSpells", "Greater Heal", 2060), false, "legacy deletion disables alert")
+            equal(group(state, groups, "Polymorph").args.spellID.get({}), "12826", "user's optional ID retained")
+            equal(group(state, groups, "Fear").args.spellID.get({}), "", "explicitly cleared optional ID retained")
+            equal(module.db[unit].castsSpells.Polymorph.priority, 33, "custom priority retained")
+            equal(module.db[unit].castsSpells.Polymorph.color.a, 0.4, "custom color retained")
+            equal(module.db[unit].castsSpells[12826].priority, 77, "exact-ID rule retained")
+        end
+        state.addon.dbi:SetProfile("Other")
+        local _, groups = options(state, lists[4], "arena")
+        equal(groups[state.addon:SpellRuleKey("Regrowth")], nil, "inactive profile deletion retained")
+        state.addon.dbi:SetProfile("Default")
+        state = reload(state)
+    end
+end)
+
 print("Passed " .. cases .. " spell rule tests")

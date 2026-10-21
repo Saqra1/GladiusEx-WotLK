@@ -12,20 +12,27 @@ local GetTime = GetTime
 local function GetDefaultCastsSpells()
     local h = { priority = 10, color = { r = 0, g = 1, b = 0, a = 1 } }
     local cc = { priority = 20, color = { r = 1, g = 0, b = 0, a = 1 } }
-    return {
-        [GladiusEx:SafeGetSpellName(2060)]    = h,     -- Greater Heal
-        [GladiusEx:SafeGetSpellName(8936)]    = h,     -- Regrowth
-        [GladiusEx:SafeGetSpellName(50464)]   = h,     -- Nourish
+    local spells = {
+        [2060] = h,     -- Greater Heal
+        [8936] = h,     -- Regrowth
+        [50464] = h,    -- Nourish
         
-        [GladiusEx:SafeGetSpellName(118)]      = cc,    -- Polymorph
-        [GladiusEx:SafeGetSpellName(5782)]     = cc,    -- Fear
-        [GladiusEx:SafeGetSpellName(51514)]    = cc,    -- Hex
-        [GladiusEx:SafeGetSpellName(20066)]    = cc,    -- Repentance
-        [GladiusEx:SafeGetSpellName(33786)]    = cc,    -- Cyclone
-        [GladiusEx:SafeGetSpellName(1513)]     = cc,    -- Scare Beast
-        [GladiusEx:SafeGetSpellName(339)]      = cc,    -- Entangling Roots
-        [GladiusEx:SafeGetSpellName(2637)]     = cc,    -- Hibernate
+        [118] = cc,     -- Polymorph
+        [5782] = cc,    -- Fear
+        [51514] = cc,   -- Hex
+        [20066] = cc,   -- Repentance
+        [33786] = cc,   -- Cyclone
+        [1513] = cc,    -- Scare Beast
+        [339] = cc,     -- Entangling Roots
+        [2637] = cc,    -- Hibernate
     }
+    local defaults = {}
+    for id, rule in pairs(spells) do
+        defaults[GladiusEx:SafeGetSpellName(id)] = {
+            priority = rule.priority, color = rule.color, spellID = id,
+        }
+    end
+    return defaults
 end
 
 local function GetDefaultAuraSpells()
@@ -53,6 +60,25 @@ local Alerts = GladiusEx:NewGladiusExModule("Alerts", {
         auras = true,
         aurasSpells = GetDefaultAuraSpells(),
     })
+
+function Alerts:OnInitialize()
+    -- AceDB fills table defaults over false values. Keep saved preset deletions
+    -- as tables with an explicit disabled marker before registering defaults.
+    local namespaces = GladiusEx.dbi.sv.namespaces or {}
+    for _, namespace in ipairs({"Alerts", "party_Alerts"}) do
+        local saved = namespaces[namespace]
+        for _, profile in pairs(saved and saved.profiles or {}) do
+            for _, field in ipairs({"castsSpells", "aurasSpells"}) do
+                for spell, rule in pairs(profile[field] or {}) do
+                    if rule == false and type(self.defaults_arena[field][spell]) == "table" then
+                        profile[field][spell] = {disabled = true}
+                    end
+                end
+            end
+        end
+    end
+    self.super.OnInitialize(self)
+end
 
 function Alerts:OnEnable()
     self:RegisterEvent("UNIT_AURA")
@@ -300,7 +326,7 @@ end
 
 function Alerts:HasExactCastRule(unit, name)
     for spell, rule in pairs(self.db[unit].castsSpells) do
-        if rule and type(spell) == "number" and GladiusEx:SpellRuleName(self.db[unit], "castsSpells", spell) == name then
+        if rule and not rule.disabled and type(spell) == "number" and GladiusEx:SpellRuleName(self.db[unit], "castsSpells", spell) == name then
             return true
         end
     end
@@ -629,12 +655,12 @@ function Alerts:GetOptions(unit)
 
     -- setup casts
     for cast, rule in pairs(self.db[unit].castsSpells) do
-        if rule then options.casts.args[GladiusEx:SpellRuleKey(cast)] = self:SetupCastOptions(options, unit, cast) end
+        if rule and not rule.disabled then options.casts.args[GladiusEx:SpellRuleKey(cast)] = self:SetupCastOptions(options, unit, cast) end
     end
 
     -- setup auras
     for aura, rule in pairs(self.db[unit].aurasSpells) do
-        if rule then options.auras.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura) end
+        if rule and not rule.disabled then options.auras.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura) end
     end
     GladiusEx:ConfigureNewSpellRule(self, unit, "castsSpells", options.casts.args,
         options.casts.args.newCast.args,
