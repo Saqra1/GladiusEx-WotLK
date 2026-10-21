@@ -7,6 +7,13 @@ L["Done"] = true
 L["Unlock to drag groups or edit their X/Y coordinates."] = true
 
 -- Important auras
+L["Check Spell ID"] = true
+L["Optional. Entering an ID alone keeps name matching enabled."] = true
+L["Enter a positive whole spell ID, or leave it empty."] = true
+L["The spell ID must have the same spell name."] = true
+L["Match only this exact spell ID. Leave unchecked to match all spells with this name."] = true
+L["Enter a spell name."] = true
+L["Name of the spell"] = true
 L["Spell name or ID"] = true
 L["Spell ID"] = true
 L["Enter an aura name or an exact numeric spell ID."] = true

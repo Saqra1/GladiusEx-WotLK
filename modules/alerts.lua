@@ -6,6 +6,7 @@ local pairs = pairs
 local min, max = math.min, math.max
 local tinsert, tremove = table.insert, table.remove
 local UnitBuff, UnitDebuff, UnitHealth, UnitHealthMax, UnitIsDeadOrGhost = UnitBuff, UnitDebuff, UnitHealth, UnitHealthMax, UnitIsDeadOrGhost
+local UnitAura = UnitAura
 local GetTime = GetTime
 
 local function GetDefaultCastsSpells()
@@ -55,6 +56,7 @@ local Alerts = GladiusEx:NewGladiusExModule("Alerts", {
 
 function Alerts:OnEnable()
     self:RegisterEvent("UNIT_AURA")
+    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self:RegisterEvent("UNIT_HEALTH")
     self:RegisterEvent("UNIT_NAME_UPDATE", "UNIT_HEALTH")
     self:RegisterEvent("UNIT_SPELLCAST_START")
@@ -252,19 +254,34 @@ end
 
 function Alerts:ClearAllAlerts(unit)
     alerts[unit] = nil
+    if self.auraAlertKeys then self.auraAlertKeys[unit] = nil end
+    if self.castAlertKeys then self.castAlertKeys[unit] = nil end
+    if self.castSuccesses then self.castSuccesses[unit] = nil end
+    if self.castEvents then self.castEvents[unit] = nil end
+    if self.pendingCastStarts then self.pendingCastStarts[unit] = nil end
 end
 
 function Alerts:UNIT_AURA(event, unit)
     if not self.frame[unit] then return end
     if not self.db[unit].auras then return end
 
-    for name, aura in pairs(self.db[unit].aurasSpells) do
-        if UnitBuff(unit, name) or UnitDebuff(unit, name) then
-            self:SetAlert(unit, "aura_" .. name, aura.priority, aura.color)
-        else
-            self:ClearAlert(unit, "aura_" .. name)
+    local active = {}
+    for _, filter in ipairs({"HELPFUL", "HARMFUL"}) do
+        for index = 1, 40 do
+            local name, _, _, _, _, _, _, _, _, _, id = UnitAura(unit, index, filter)
+            if not name then break end
+            local aura, key = GladiusEx:GetSpellRule(self.db[unit], "aurasSpells", name, id)
+            if aura then active[GladiusEx:SpellRuleKey(key)] = aura end
         end
     end
+    self.auraAlertKeys = self.auraAlertKeys or {}
+    for key in pairs(self.auraAlertKeys[unit] or {}) do
+        if not active[key] then self:ClearAlert(unit, "aura_" .. key) end
+    end
+    for key, aura in pairs(active) do
+        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color)
+    end
+    self.auraAlertKeys[unit] = active
 end
 
 function Alerts:UNIT_HEALTH(event, unit)
@@ -281,40 +298,95 @@ function Alerts:UNIT_HEALTH(event, unit)
     end
 end
 
-function Alerts:UNIT_SPELLCAST_START(event, unit, spell)
-    if not self.frame[unit] then return end
-    if not self.db[unit].casts then return end
+function Alerts:HasExactCastRule(unit, name)
+    for spell, rule in pairs(self.db[unit].castsSpells) do
+        if rule and type(spell) == "number" and GladiusEx:SpellRuleName(self.db[unit], "castsSpells", spell) == name then
+            return true
+        end
+    end
+    return false
+end
 
-    local cast = self.db[unit].castsSpells[spell]
-    if cast then
-        self:SetAlert(unit, "cast_" .. spell, cast.priority, cast.color)
+function Alerts:ShowCastAlert(unit, name, id, succeeded)
+    if not self.frame[unit] or not self.db[unit].casts then return end
+    local cast, key = GladiusEx:GetSpellRule(self.db[unit], "castsSpells", name, id)
+    if not cast then return end
+    local alert = "cast_" .. GladiusEx:SpellRuleKey(key)
+    self.castAlertKeys = self.castAlertKeys or {}
+    if succeeded then
+        self.castSuccesses = self.castSuccesses or {}
+        local last = self.castSuccesses[unit]
+        if last and last.key == alert and GetTime() - last.time < 0.05 then return end
+        self.castSuccesses[unit] = {key = alert, time = GetTime()}
+        if self:IsAlertActive(unit, alert) then return end
+        self:SetAlert(unit, alert, cast.priority, cast.color)
+        self:ClearAlert(unit, alert, 1)
+    else
+        local old = self.castAlertKeys[unit]
+        if old and old.alert ~= alert then self:ClearAlert(unit, old.alert) end
+        self.castAlertKeys[unit] = {alert = alert, name = name}
+        self:SetAlert(unit, alert, cast.priority, cast.color)
     end
 end
 
-function Alerts:UNIT_SPELLCAST_SUCCEEDED(event, unit, spell)
-    if not self.frame[unit] then return end
-    if not self.db[unit].casts then return end
-
-    local cast = self.db[unit].castsSpells[spell]
-    if cast and not self:IsAlertActive(unit, "cast_" .. spell) then
-        self:SetAlert(unit, "cast_" .. spell, cast.priority, cast.color)
-        self:ClearAlert(unit, "cast_" .. spell, 1)
+function Alerts:UNIT_SPELLCAST_START(event, unit, spell, rank, lineID, spellID)
+    if not self.frame[unit] or not self.db[unit].casts then return end
+    if type(spell) == "number" then spellID, spell = spell, GetSpellInfo(spell) end
+    if not spell then return end
+    -- Older unit events omit IDs. Wait for the combat log when an exact rule
+    -- could apply, instead of guessing an enemy's rank from its spell name.
+    if not spellID and self:HasExactCastRule(unit, spell) then
+        local recent = self.castEvents and self.castEvents[unit]
+        if recent and recent.name == spell and GetTime() - recent.time < 0.05 then
+            spellID = recent.id
+        else
+            self.pendingCastStarts = self.pendingCastStarts or {}
+            self.pendingCastStarts[unit] = spell
+            return
+        end
     end
+    self:ShowCastAlert(unit, spell, spellID, false)
+end
+
+function Alerts:UNIT_SPELLCAST_SUCCEEDED(event, unit, spell, rank, lineID, spellID)
+    if not self.frame[unit] or not self.db[unit].casts then return end
+    if type(spell) == "number" then spellID, spell = spell, GetSpellInfo(spell) end
+    if not spell then return end
+    if not spellID and self:HasExactCastRule(unit, spell) then return end
+    self:ShowCastAlert(unit, spell, spellID, true)
 end
 
 function Alerts:UNIT_SPELLCAST_STOP(event, unit, spell)
-    if not self.frame[unit] then return end
-    if not self.db[unit].casts then return end
-
-    self:ClearAlert(unit, "cast_" .. spell)
+    if not self.frame[unit] or not self.db[unit].casts then return end
+    if type(spell) == "number" then spell = GetSpellInfo(spell) end
+    if self.pendingCastStarts and (not spell or self.pendingCastStarts[unit] == spell) then
+        self.pendingCastStarts[unit] = nil
+    end
+    local current = self.castAlertKeys and self.castAlertKeys[unit]
+    if current and (not spell or spell == current.name) then
+        self:ClearAlert(unit, current.alert)
+        self.castAlertKeys[unit] = nil
+    end
 end
 
-local function HasAuraEditBox()
-    return not not LibStub("AceGUI-3.0").WidgetVersions["Aura_EditBox"]
-end
-
-local function HasSpellEditBox()
-    return not not LibStub("AceGUI-3.0").WidgetVersions["Spell_EditBox"]
+function Alerts:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, kind, sourceGUID, sourceName, sourceFlags,
+        destGUID, destName, destFlags, spellID, spellName, spellSchool, extraID, extraName)
+    if kind ~= "SPELL_CAST_START" and kind ~= "SPELL_CAST_SUCCESS" and
+        kind ~= "SPELL_CAST_FAILED" and kind ~= "SPELL_INTERRUPT" then return end
+    local unit = GladiusEx:GetUnitIdByGUID(kind == "SPELL_INTERRUPT" and destGUID or sourceGUID)
+    if not unit or not self.frame[unit] or not self.db[unit].casts then return end
+    local name = kind == "SPELL_INTERRUPT" and extraName or spellName
+    if not self:HasExactCastRule(unit, name) then return end
+    if kind == "SPELL_CAST_FAILED" or kind == "SPELL_INTERRUPT" then
+        self:UNIT_SPELLCAST_STOP(event, unit, name)
+    else
+        self.castEvents = self.castEvents or {}
+        self.castEvents[unit] = {name = name, id = spellID, time = GetTime()}
+        local pending = self.pendingCastStarts and self.pendingCastStarts[unit] == name
+        if pending then self.pendingCastStarts[unit] = nil end
+        -- Channels can report CAST_SUCCESS when they start, without CAST_START.
+        self:ShowCastAlert(unit, name, spellID, kind == "SPELL_CAST_SUCCESS" and not pending)
+    end
 end
 
 function Alerts:GetOptions(unit)
@@ -470,16 +542,6 @@ function Alerts:GetOptions(unit)
                     inline = true,
                     order = 1,
                     args = {
-                        name = {
-                            type = "input",
-                            dialogControl = HasSpellEditBox() and "Spell_EditBox" or nil,
-                            name = L["Spell name"],
-                            desc = L["Name of the cast spell"],
-                            get = function() return self.newCastName or "" end,
-                            set = function(info, value) self.newCastName = GetSpellInfo(value) or value end,
-                            disabled = function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end,
-                            order = 1,
-                        },
                         priority = {
                             type= "range",
                             name = L["Alert priority"],
@@ -503,16 +565,6 @@ function Alerts:GetOptions(unit)
                         add = {
                             type = "execute",
                             name = L["Add new cast"],
-                            func = function(info)
-                                self.db[unit].castsSpells[self.newCastName] = {
-                                    priority = self.newCastPriority,
-                                    color = self.newCastColor,
-                                }
-                                options.casts.args[self.newCastName] = self:SetupCastOptions(options, unit, self.newCastName)
-                                self.newCastName = nil
-                                GladiusEx:UpdateFrames()
-                            end,
-                            disabled = function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) or not (self.newCastName and self.newCastPriority and self.newCastColor) end,
                             order = 4,
                         },
                     },
@@ -539,16 +591,6 @@ function Alerts:GetOptions(unit)
                     inline = true,
                     order = 1,
                     args = {
-                        name = {
-                            type = "input",
-                            dialogControl = HasAuraEditBox() and "Aura_EditBox" or nil,
-                            name = L["Aura name"],
-                            desc = L["Name of the aura"],
-                            get = function() return self.newAuraName or "" end,
-                            set = function(info, value) self.newAuraName = GetSpellInfo(value) or value end,
-                            disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
-                            order = 1,
-                        },
                         priority = {
                             type= "range",
                             name = L["Alert priority"],
@@ -571,16 +613,6 @@ function Alerts:GetOptions(unit)
                         add = {
                             type = "execute",
                             name = L["Add new aura"],
-                            func = function(info)
-                                self.db[unit].aurasSpells[self.newAuraName] = {
-                                    priority = self.newAuraPriority,
-                                    color = self.newAuraColor,
-                                }
-                                options.auras.args[self.newAuraName] = self:SetupAuraOptions(options, unit, self.newAuraName)
-                                self.newAuraName = nil
-                                GladiusEx:UpdateFrames()
-                            end,
-                            disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) or not (self.newAuraName and self.newAuraPriority and self.newAuraColor) end,
                             order = 4,
                         },
                     },
@@ -596,142 +628,63 @@ function Alerts:GetOptions(unit)
     self.newAuraColor = { r = 1, g = 0, b = 0, a = 1 }
 
     -- setup casts
-    for cast in pairs(self.db[unit].castsSpells) do
-        options.casts.args[cast] = self:SetupCastOptions(options, unit, cast)
+    for cast, rule in pairs(self.db[unit].castsSpells) do
+        if rule then options.casts.args[GladiusEx:SpellRuleKey(cast)] = self:SetupCastOptions(options, unit, cast) end
     end
 
     -- setup auras
-    for aura in pairs(self.db[unit].aurasSpells) do
-        options.auras.args[aura] = self:SetupAuraOptions(options, unit, aura)
+    for aura, rule in pairs(self.db[unit].aurasSpells) do
+        if rule then options.auras.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura) end
     end
+    GladiusEx:ConfigureNewSpellRule(self, unit, "castsSpells", options.casts.args,
+        options.casts.args.newCast.args,
+        function() return {priority = self.newCastPriority, color = self.newCastColor} end,
+        function(cast) return self:SetupCastOptions(options, unit, cast) end,
+        function() return not self:IsUnitEnabled(unit) or not self.db[unit].casts end)
+    GladiusEx:ConfigureNewSpellRule(self, unit, "aurasSpells", options.auras.args,
+        options.auras.args.newAura.args,
+        function() return {priority = self.newAuraPriority, color = self.newAuraColor} end,
+        function(aura) return self:SetupAuraOptions(options, unit, aura) end,
+        function() return not self:IsUnitEnabled(unit) or not self.db[unit].auras end)
 
     return options
 end
 
-function Alerts:SetupCastOptions(options, unit, cast)
-    return {
-        type = "group",
-        name = cast,
-        desc = cast,
-        disabled = function() return not self:IsUnitEnabled(unit) end,
-        args = {
-            name = {
-                type = "input",
-                dialogControl = HasSpellEditBox() and "Spell_EditBox" or nil,
-                name = L["Spell name"],
-                desc = L["Name of the cast"],
-                get = function(info) return info[#(info) - 1] end,
-                set = function(info, value)
-                    local old_name = info[#(info) - 1]
-                    -- create new cast
-                    self.db[unit].castsSpells[value] = self.db[unit].castsSpells[old_name]
-                    options.casts.args[value] = self:SetupCastOptions(options, unit, value)
-                    -- delete old cast
-                    self.db[unit].castsSpells[old_name] = nil
-                    options.casts.args[old_name] = nil
-                    GladiusEx:UpdateFrames()
-                end,
-                disabled = function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end,
-                order = 1,
-            },
-            priority = {
-                type= "range",
-                name = L["Alert priority"],
-                desc = L["Select what priority the cast should have - higher equals more priority"],
-                min = 0, softMax = 100, step = 1,
-                get = function() return self.db[unit].castsSpells[cast].priority end,
-                set = function(info, value)
-                    self.db[unit].castsSpells[cast].priority = value
-                    GladiusEx:UpdateFrames()
-                end,
-                order = 2,
-            },
-            color = {
-                type = "color",
-                name = L["Alert color"],
-                name = L["Alert overlay color"],
-                hasAlpha = true,
-                get = function(info) return self.db[unit].castsSpells[cast].color.r, self.db[unit].castsSpells[cast].color.g, self.db[unit].castsSpells[cast].color.b, self.db[unit].castsSpells[cast].color.a end,
-                set = function(info, r, g, b, a) self.db[unit].castsSpells[cast].color = { r = r, g = g, b = b, a = a } end,
-                disabled = function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end,
-                order = 3,
-            },
-            delete = {
-                type = "execute",
-                name = L["Delete"],
-                func = function(info)
-                    local name = info[#(info) - 1]
-                    self.db[unit].castsSpells[name] = nil
-                    options.casts.args[name] = nil
-                    GladiusEx:UpdateFrames()
-                end,
-                disabled = function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end,
-                order = 4,
-            },
-        },
-    }
+function Alerts:SetupCastOptions(options, unit, spell)
+    return self:SetupSpellOptions(options, unit, spell, "castsSpells", "casts")
 end
 
-function Alerts:SetupAuraOptions(options, unit, aura)
-    return {
-        type = "group",
-        name = aura,
-        desc = aura,
-        disabled = function() return not self:IsUnitEnabled(unit) end,
+function Alerts:SetupAuraOptions(options, unit, spell)
+    return self:SetupSpellOptions(options, unit, spell, "aurasSpells", "auras")
+end
+
+function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
+    local disabled = function() return not self:IsUnitEnabled(unit) or not self.db[unit][kind] end
+    local group = {
+        type = "group", name = tostring(spell), disabled = disabled,
         args = {
-            name = {
-                type = "input",
-                dialogControl = HasAuraEditBox() and "Aura_EditBox" or nil,
-                name = L["Aura name"],
-                desc = L["Name of the aura"],
-                get = function(info) return info[#(info) - 1] end,
-                set = function(info, value)
-                    local old_name = info[#(info) - 1]
-                    -- create new aura
-                    self.db[unit].aurasSpells[value] = self.db[unit].aurasSpells[old_name]
-                    options.auras.args[value] = self:SetupAuraOptions(options, unit, value)
-                    -- delete old aura
-                    self.db[unit].aurasSpells[old_name] = nil
-                    options.auras.args[old_name] = nil
-                    GladiusEx:UpdateFrames()
-                end,
-                disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
-                order = 1,
-            },
             priority = {
-                type= "range",
-                name = L["Alert priority"],
-                desc = L["Select what priority the aura should have - higher equals more priority"],
-                min = 0, softMax = 100, step = 1,
-                get = function() return self.db[unit].aurasSpells[aura].priority end,
+                type = "range", name = L["Alert priority"], min = 0, softMax = 100, step = 1, order = 2,
+                get = function() return self.db[unit][field][spell].priority end,
                 set = function(info, value)
-                    self.db[unit].aurasSpells[aura].priority = value
+                    self.db[unit][field][spell].priority = value
                     GladiusEx:UpdateFrames()
                 end,
-                order = 2,
             },
             color = {
-                type = "color",
-                name = L["Alert color"],
-                name = L["Alert overlay color"],
-                hasAlpha = true,
-                get = function(info) return self.db[unit].aurasSpells[aura].color.r, self.db[unit].aurasSpells[aura].color.g, self.db[unit].aurasSpells[aura].color.b, self.db[unit].aurasSpells[aura].color.a end,
-                set = function(info, r, g, b, a) self.db[unit].aurasSpells[aura].color = { r = r, g = g, b = b, a = a } end,
-                disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
-                order = 3,
-            },
-            delete = {
-                type = "execute",
-                name = L["Delete"],
-                func = function(info)
-                    local name = info[#(info) - 1]
-                    self.db[unit].aurasSpells[name] = nil
-                    options.auras.args[name] = nil
+                type = "color", name = L["Alert overlay color"], hasAlpha = true, order = 3,
+                get = function()
+                    local c = self.db[unit][field][spell].color
+                    return c.r, c.g, c.b, c.a
+                end,
+                set = function(info, r, g, b, a)
+                    self.db[unit][field][spell].color = {r = r, g = g, b = b, a = a}
                     GladiusEx:UpdateFrames()
                 end,
-                disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
-                order = 4,
             },
+            delete = {type = "execute", name = L["Delete"], order = 4, disabled = disabled},
         },
     }
+    return GladiusEx:ConfigureSpellRule(self, unit, field, options[kind].args, spell, group,
+        function(key) return self:SetupSpellOptions(options, unit, key, field, kind) end, disabled)
 end

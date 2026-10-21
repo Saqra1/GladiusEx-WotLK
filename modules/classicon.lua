@@ -23,224 +23,467 @@ local UnitIsConnected = Spectate and Spectate.UnitIsConnected or UnitIsConnected
 -- Nonetheless, if you think that we missed an important aura, please post it on the addon site at curse or wowace
 local function GetDefaultImportantAuras()
     return {
-        -- Spell Name                           = Priority (higher = more priority)
+        -- Exact spell ID = priority (higher = more priority). Ranks are listed separately.
+        [44166] = 9.4, -- Refreshment
+        [46755] = 9.4, -- Drink
+        [27089] = 9.4, -- Drink
+        [27827] = 9.3, -- Spirit of Redemption
+        [5384] = 9.2, -- Feign Death
+        [66] = 9.2, -- Invisibility
+        [32612] = 9.2, -- Invisibility
+        [1784] = 9.2, -- Stealth
+        [5215] = 9.2, -- Prowl
+        [11327] = 9.2, -- Vanish (Rank 1)
+        [11329] = 9.2, -- Vanish (Rank 2)
+        [26888] = 9.2, -- Vanish (Rank 3)
+        [33786] = 9.1, -- Cyclone
+        [20549] = 9, -- War Stomp (Racial)
+        [56] = 9, -- Stun
+        [25275] = 9, -- Intercept (Rank 5)
+        [28271] = 9, -- Polymorph (Turtle)
+        [28272] = 9, -- Polymorph (Pig)
+        [28445] = 9, -- Improved Concussive Shot
+        [37506] = 9, -- Scatter Shot
+        [3355] = 9, -- Freezing Trap Effect (Rank 1)
+        [14308] = 9, -- Freezing Trap Effect (Rank 2)
+        [14309] = 9, -- Freezing Trap Effect (Rank 3)
+        [13327] = 9, -- Reckless Charge
+        [30216] = 9, -- Fel Iron Bomb
+        [67769] = 9, -- Cobalt Frag Bomb
+        [30217] = 9, -- Adamantite Grenade
+        [46968] = 9, -- Shockwave
+        [5246] = 9, -- Intimidating Shout
+        [20253] = 9, -- Intercept (Rank 1)
+        [20614] = 9, -- Intercept (Rank 2)
+        [20615] = 9, -- Intercept (Rank 3)
+        [25273] = 9, -- Intercept (Rank 4)
+        [25274] = 9, -- Intercept (Rank 5)
+        [6544] = 9, -- Heroic Leap
+        [12809] = 9, -- Concussion Blow
+        [12798] = 9, -- Revenge Stun (Rank 1)
+        [100] = 9, -- Charge (Rank 1)
+        [6178] = 9, -- Charge (Rank 2)
+        [11578] = 9, -- Charge (Rank 3)
+        [7922] = 9, -- Charge Stun
+        [30283] = 9, -- Shadowfury (Rank 1)
+        [30413] = 9, -- Shadowfury (Rank 2)
+        [30414] = 9, -- Shadowfury (Rank 3)
+        [47846] = 9, -- Shadowfury (Rank 4)
+        [47847] = 9, -- Shadowfury (Rank 5)
+        [6358] = 9, -- Seduction
+        [5484] = 9, -- Howl of Terror (Rank 1)
+        [17928] = 9, -- Howl of Terror (Rank 2)
+        [5782] = 9, -- Fear (Rank 1)
+        [6213] = 9, -- Fear (Rank 2)
+        [6215] = 9, -- Fear (Rank 3)
+        [54786] = 9, -- Demon Leap
+        [6789] = 9, -- Death Coil (Rank 1)
+        [17925] = 9, -- Death Coil (Rank 2)
+        [17926] = 9, -- Death Coil (Rank 3)
+        [27223] = 9, -- Death Coil (Rank 4)
+        [47859] = 9, -- Death Coil (Rank 5)
+        [47860] = 9, -- Death Coil (Rank 6)
+        [710] = 9, -- Banish (Rank 1)
+        [18647] = 9, -- Banish (Rank 2)
+        [39796] = 9, -- Stoneclaw Stun
+        [51514] = 9, -- Hex
+        [61882] = 9, -- Earthquake (Rank 1)
+        [6770] = 9, -- Sap (Rank 1)
+        [2070] = 9, -- Sap (Rank 2)
+        [11297] = 9, -- Sap (Rank 3)
+        [51724] = 9, -- Sap (Rank 4)
+        [408] = 9, -- Kidney Shot (Rank 1)
+        [8643] = 9, -- Kidney Shot (Rank 2)
+        [1776] = 9, -- Gouge
+        [1833] = 9, -- Cheap Shot
+        [2094] = 9, -- Blind
+        [9484] = 9, -- Shackle Undead (Rank 1)
+        [9485] = 9, -- Shackle Undead (Rank 2)
+        [10955] = 9, -- Shackle Undead (Rank 3)
+        [8122] = 9, -- Psychic Scream (Rank 1)
+        [8124] = 9, -- Psychic Scream (Rank 2)
+        [10888] = 9, -- Psychic Scream (Rank 3)
+        [10890] = 9, -- Psychic Scream (Rank 4)
+        [64044] = 9, -- Psychic Horror
+        [605] = 9, -- Mind Control
+        [10326] = 9, -- Turn Evil
+        [20066] = 9, -- Repentance
+        [2812] = 9, -- Holy Wrath (Rank 1)
+        [10318] = 9, -- Holy Wrath (Rank 2)
+        [27139] = 9, -- Holy Wrath (Rank 3)
+        [48816] = 9, -- Holy Wrath (Rank 4)
+        [48817] = 9, -- Holy Wrath (Rank 5)
+        [853] = 9, -- Hammer of Justice (Rank 1)
+        [5588] = 9, -- Hammer of Justice (Rank 2)
+        [5589] = 9, -- Hammer of Justice (Rank 3)
+        [10308] = 9, -- Hammer of Justice (Rank 4)
+        [118] = 9, -- Polymorph (Rank 1)
+        [12824] = 9, -- Polymorph (Rank 2)
+        [12825] = 9, -- Polymorph (Rank 3)
+        [12826] = 9, -- Polymorph (Rank 4)
+        [12355] = 9, -- Impact (Rank 1)
+        [31661] = 9, -- Dragon's Breath (Rank 1)
+        [33041] = 9, -- Dragon's Breath (Rank 2)
+        [33042] = 9, -- Dragon's Breath (Rank 3)
+        [33043] = 9, -- Dragon's Breath (Rank 4)
+        [42949] = 9, -- Dragon's Breath (Rank 5)
+        [42950] = 9, -- Dragon's Breath (Rank 6)
+        [44572] = 9, -- Deep Freeze
+        [50519] = 9, -- Sonic Blast (Rank 1)
+        [53564] = 9, -- Sonic Blast (Rank 2)
+        [53565] = 9, -- Sonic Blast (Rank 3)
+        [53566] = 9, -- Sonic Blast (Rank 4)
+        [53567] = 9, -- Sonic Blast (Rank 5)
+        [53568] = 9, -- Sonic Blast (Rank 6)
+        [50518] = 9, -- Ravage (Rank 1)
+        [53558] = 9, -- Ravage (Rank 2)
+        [53559] = 9, -- Ravage (Rank 3)
+        [53560] = 9, -- Ravage (Rank 4)
+        [53561] = 9, -- Ravage (Rank 5)
+        [53562] = 9, -- Ravage (Rank 6)
+        [19386] = 9, -- Wyvern Sting (Rank 1)
+        [24132] = 9, -- Wyvern Sting (Rank 2)
+        [24133] = 9, -- Wyvern Sting (Rank 3)
+        [27068] = 9, -- Wyvern Sting (Rank 4)
+        [49011] = 9, -- Wyvern Sting (Rank 5)
+        [49012] = 9, -- Wyvern Sting (Rank 6)
+        [19503] = 9, -- Scatter Shot
+        [1513] = 9, -- Scare Beast (Rank 1)
+        [14326] = 9, -- Scare Beast (Rank 2)
+        [14327] = 9, -- Scare Beast (Rank 3)
+        [24394] = 9, -- Intimidation
 
-        [GladiusEx:SafeGetSpellName(44166)] = 9.4, -- Refreshment
-        [GladiusEx:SafeGetSpellName(46755)] = 9.4, -- Drink
-        [GladiusEx:SafeGetSpellName(27089)] = 9.4, -- Drink
-        [GladiusEx:SafeGetSpellName(27827)] = 9.3, -- Spirit of Redemption
-        [GladiusEx:SafeGetSpellName(5384)] = 9.2, -- Feign Death
-        [GladiusEx:SafeGetSpellName(66)] = 9.2, -- Invisibility
-        [GladiusEx:SafeGetSpellName(32612)] = 9.2, -- Invisibility
-        [GladiusEx:SafeGetSpellName(1784)] = 9.2, -- Stealth
-        [GladiusEx:SafeGetSpellName(5215)] = 9.2, -- Prowl
-        [GladiusEx:SafeGetSpellName(11327)] = 9.2, -- Vanish
-        [GladiusEx:SafeGetSpellName(33786)] = 9.1, -- Cyclone
-        [GladiusEx:SafeGetSpellName(20549)] = 9, -- War Stomp
-        [GladiusEx:SafeGetSpellName(56)] = 9,   -- Stun
-        [GladiusEx:SafeGetSpellName(25275)] = 9, -- Intercept
-        [GladiusEx:SafeGetSpellName(28271)] = 9, -- Polymorph (Turtle)
-        [GladiusEx:SafeGetSpellName(28272)] = 9, -- Polymorph (Pig)
-        [GladiusEx:SafeGetSpellName(28445)] = 9, -- Improved Concussive Shot (Stun)
-        [GladiusEx:SafeGetSpellName(37506)] = 9, -- Scatter Shot
-        [GladiusEx:SafeGetSpellName(3355)] = 9, --  Freezing Trap Effect
-        [GladiusEx:SafeGetSpellName(13327)] = 9, -- Reckless Charge
-        [GladiusEx:SafeGetSpellName(30216)] = 9, -- Fel Iron Bomb
-        [GladiusEx:SafeGetSpellName(67769)] = 9, -- Cobalt Frag Bomb
-        [GladiusEx:SafeGetSpellName(30217)] = 9, -- Adamantite Grenade
-        [GladiusEx:SafeGetSpellName(46968)] = 9, -- Shockwave
-        [GladiusEx:SafeGetSpellName(5246)] = 9, -- Intimidating Shout
-        [GladiusEx:SafeGetSpellName(20253)] = 9, -- Intercept
-        [GladiusEx:SafeGetSpellName(6544)] = 9, -- Heroic Leap
-        [GladiusEx:SafeGetSpellName(12809)] = 9, -- Concussion Blow
-        [GladiusEx:SafeGetSpellName(100)] = 9, -- Charge (R1)
-        [GladiusEx:SafeGetSpellName(7922)] = 9, -- Charge Stun
-        [GladiusEx:SafeGetSpellName(30283)] = 9, -- Shadowfury
-        [GladiusEx:SafeGetSpellName(6358)] = 9, -- Seduction
-        [GladiusEx:SafeGetSpellName(5484)] = 9, -- Howl of Terror
-        [GladiusEx:SafeGetSpellName(5782)] = 9, -- Fear
-        [GladiusEx:SafeGetSpellName(54786)] = 9, -- Demon Leap
-        [GladiusEx:SafeGetSpellName(6789)] = 9, -- Death Coil
-        [GladiusEx:SafeGetSpellName(710)] = 9, -- Banish
-        [GladiusEx:SafeGetSpellName(39796)] = 9, -- Stoneclaw Stun
-        [GladiusEx:SafeGetSpellName(51514)] = 9, -- Hex
-        [GladiusEx:SafeGetSpellName(61882)] = 9, -- Earthquake
-        [GladiusEx:SafeGetSpellName(6770)] = 9, -- Sap
-        [GladiusEx:SafeGetSpellName(408)] = 9, -- Kidney Shot
-        [GladiusEx:SafeGetSpellName(1776)] = 9, -- Gouge
-        [GladiusEx:SafeGetSpellName(1833)] = 9, -- Cheap Shot
-        [GladiusEx:SafeGetSpellName(2094)] = 9, -- Blind
-        [GladiusEx:SafeGetSpellName(9484)] = 9, -- Shackle Undead
-        [GladiusEx:SafeGetSpellName(8122)] = 9, -- Psychic Scream
-        [GladiusEx:SafeGetSpellName(64044)] = 9, -- Psychic Horror
-        [GladiusEx:SafeGetSpellName(605)] = 9, -- Mind Control
-        [GladiusEx:SafeGetSpellName(10326)] = 9, -- Turn Evil
-        [GladiusEx:SafeGetSpellName(20066)] = 9, -- Repentance
-        [GladiusEx:SafeGetSpellName(2812)] = 9, -- Holy Wrath
-        [GladiusEx:SafeGetSpellName(853)] = 9, -- Hammer of Justice
-        [GladiusEx:SafeGetSpellName(118)] = 9, -- Polymorph
-        [GladiusEx:SafeGetSpellName(12355)] = 9, -- Impact
-        [GladiusEx:SafeGetSpellName(31661)] = 9, -- Dragon's Breath
-        [GladiusEx:SafeGetSpellName(44572)] = 9, -- Deep Freeze
-        [GladiusEx:SafeGetSpellName(50519)] = 9, -- Sonic Blast
-        [GladiusEx:SafeGetSpellName(19386)] = 9, -- Wyvern Sting
-        [GladiusEx:SafeGetSpellName(19503)] = 9, -- Scatter Shot
-        [GladiusEx:SafeGetSpellName(1513)] = 9, -- Scare Beast
-        [GladiusEx:SafeGetSpellName(24394)] = 9, -- Intimidation
-        [GladiusEx:SafeGetSpellName(14309)] = 9,  -- Freezing Trap
-        [GladiusEx:SafeGetSpellName(60210)] = 9, -- Freezing Arrow Effect
-        [GladiusEx:SafeGetSpellName(9005)] = 9, -- Pounce
-        [GladiusEx:SafeGetSpellName(22570)] = 9, -- Maim
-        [GladiusEx:SafeGetSpellName(2637)] = 9, -- Hibernate
-        [GladiusEx:SafeGetSpellName(5211)] = 9, -- Bash
-        [GladiusEx:SafeGetSpellName(49203)] = 9, -- Hungering Cold
-        [GladiusEx:SafeGetSpellName(47481)] = 9, -- Gnaw
-        [GladiusEx:SafeGetSpellName(45438)] = 8.9, -- Ice Block
-        [GladiusEx:SafeGetSpellName(642)] = 8.9, -- Divine Shield
-        [GladiusEx:SafeGetSpellName(47585)] = 8.9, -- Dispersion
-        [GladiusEx:SafeGetSpellName(19263)] = 8.9, -- Deterrence
-        [GladiusEx:SafeGetSpellName(46924)] = 8.9, -- Bladestorm
-        [GladiusEx:SafeGetSpellName(19574)] = 8.9, -- Bestial Wrath
-        [GladiusEx:SafeGetSpellName(34692)] = 8.9, -- The Beast Within
-        [GladiusEx:SafeGetSpellName(6940)] = 8.8, -- Hand of Sacrifice
-        [GladiusEx:SafeGetSpellName(23920)] = 8.7, -- Spell Reflection
-        [GladiusEx:SafeGetSpellName(8178)] = 8.7, -- Grounding Totem Effect
-        [GladiusEx:SafeGetSpellName(31224)] = 8.7, -- Cloak of Shadows
-        [GladiusEx:SafeGetSpellName(48707)] = 8.7, -- Anti-Magic Shell
-        [GladiusEx:SafeGetSpellName(48792)] = 8.6, -- Icebound Fortitude
-        [GladiusEx:SafeGetSpellName(3411)] = 8.6, --  Intervene
-        [GladiusEx:SafeGetSpellName(1022)] = 8.6, -- Hand of Protection
-        [GladiusEx:SafeGetSpellName(49039)] = 8.4, -- Lichborne
-        [GladiusEx:SafeGetSpellName(18499)] = 8.4, -- Berserker Rage
-        [GladiusEx:SafeGetSpellName(5277)] = 8.2, -- Evasion
-        [GladiusEx:SafeGetSpellName(38031)] = 8.2, -- Shield Block
-        [GladiusEx:SafeGetSpellName(55021)] = 7, -- Silenced  Improved Counterspell
-        [GladiusEx:SafeGetSpellName(25046)] = 7, -- Arcane Torrent
-        [GladiusEx:SafeGetSpellName(18498)] = 7, -- Silenced  Gag Order
-        [GladiusEx:SafeGetSpellName(31117)] = 7, -- Unstable Affliction
-        [GladiusEx:SafeGetSpellName(24259)] = 7, -- Spell Lock
-        [GladiusEx:SafeGetSpellName(18425)] = 7, -- Silenced  Improved Kick
-        [GladiusEx:SafeGetSpellName(1330)] = 7, -- Garrote (Silence)
-        [GladiusEx:SafeGetSpellName(15487)] = 7, -- Silence
-        [GladiusEx:SafeGetSpellName(31935)] = 7, -- Avenger's Shield
-        [GladiusEx:SafeGetSpellName(18469)] = 7, -- Silenced  (Improved Counterspell)
-        [GladiusEx:SafeGetSpellName(34490)] = 7, -- Silencing Shot
-        [GladiusEx:SafeGetSpellName(47476)] = 7, -- Strangulate
-        [GladiusEx:SafeGetSpellName(27559)] = 7, -- Silence (UA Dispel)
-        [GladiusEx:SafeGetSpellName(18708)] = 6, -- Fel Domination
-        [GladiusEx:SafeGetSpellName(1044)] = 5.5, -- Hand of Freedom
-        [GladiusEx:SafeGetSpellName(54216)] = 5.5, -- Master's Call
-        [GladiusEx:SafeGetSpellName(16979)] = 5, -- Feral Charge - Bear
-        [GladiusEx:SafeGetSpellName(16689)] = 5, -- Nature's Grasp
-        [GladiusEx:SafeGetSpellName(13099)] = 5, -- NetoMatic
-        [GladiusEx:SafeGetSpellName(55536)] = 5, -- Frostweave Net
-        [GladiusEx:SafeGetSpellName(39965)] = 5, -- Frost Grenade
-        [GladiusEx:SafeGetSpellName(23694)] = 5, -- Improved Hamstring
-        [GladiusEx:SafeGetSpellName(63685)] = 5, -- Freeze
-        [GladiusEx:SafeGetSpellName(64695)] = 5, -- Earthgrab
-        [GladiusEx:SafeGetSpellName(122)] = 5, -- Frost Nova
-        [GladiusEx:SafeGetSpellName(33395)] = 5, -- Freeze
-        [GladiusEx:SafeGetSpellName(4167)] = 5, -- Web
-        [GladiusEx:SafeGetSpellName(54706)] = 5, -- Venom Web Spray
-        [GladiusEx:SafeGetSpellName(50245)] = 5, -- Pin
-        [GladiusEx:SafeGetSpellName(19185)] = 5, -- Entrapment
-        [GladiusEx:SafeGetSpellName(19306)] = 5, -- Counterattack
-        [GladiusEx:SafeGetSpellName(45334)] = 5, -- Feral Charge Effect
-        [GladiusEx:SafeGetSpellName(339)] = 5, -- Entangling Roots
-        [GladiusEx:SafeGetSpellName(676)] = 4, -- Disarm
-        [GladiusEx:SafeGetSpellName(53359)] = 4, -- Chimera Shot - Scorpid
-        [GladiusEx:SafeGetSpellName(51722)] = 4, -- Dismantle
-        [GladiusEx:SafeGetSpellName(64346)] = 4, -- Fiery Payback
-        [GladiusEx:SafeGetSpellName(50541)] = 4, -- Snatch
-        [GladiusEx:SafeGetSpellName(51271)] = 3, -- Pillar of Frost
-        [GladiusEx:SafeGetSpellName(12043)] = 2.6, -- Presence of Mind
-        [GladiusEx:SafeGetSpellName(12042)] = 2.5, -- Arcane Power
-        [GladiusEx:SafeGetSpellName(14177)] = 2.6, -- Cold Blood
-        [GladiusEx:SafeGetSpellName(16188)] = 2.6, -- Nature's Swiftness
-        [GladiusEx:SafeGetSpellName(17116)] = 2.6, -- Nature's Swiftness
-        [GladiusEx:SafeGetSpellName(1719)] = 2.6, -- Recklessness
-        [GladiusEx:SafeGetSpellName(5217)] = 2.6, -- Tiger's Fury
-        [GladiusEx:SafeGetSpellName(29977)] = 2.6, -- Combustion
-        [GladiusEx:SafeGetSpellName(12292)] = 2.5, -- Death Wish
-        [GladiusEx:SafeGetSpellName(12472)] = 2.5, -- Icy Veins
-        [GladiusEx:SafeGetSpellName(13750)] = 2.5, -- Adrenaline Rush
-        [GladiusEx:SafeGetSpellName(3045)] = 2.5, -- Rapid Fire
-        [GladiusEx:SafeGetSpellName(53201)] = 2.5, -- Starfall
-        [GladiusEx:SafeGetSpellName(51713)] = 2.5, -- Shadow Dance
-        [GladiusEx:SafeGetSpellName(30823)] = 2.5, -- Shamanistic Rage
-        [GladiusEx:SafeGetSpellName(31884)] = 2.5, -- Avenging Wrath
-        [GladiusEx:SafeGetSpellName(33206)] = 2.5, -- Pain Suppression
-        [GladiusEx:SafeGetSpellName(498)] = 2.5, -- Divine Protection
-        [GladiusEx:SafeGetSpellName(12328)] = 2.4, -- Sweeping Strikes
-        [GladiusEx:SafeGetSpellName(13877)] = 2.4, -- Blade Flurry
-        [GladiusEx:SafeGetSpellName(32182)] = 0.4, -- Heroism
-        [GladiusEx:SafeGetSpellName(2825)] = 0.4, -- Bloodlust
-        [GladiusEx:SafeGetSpellName(22842)] = 2.1, -- Frenzied Regeneration
-        [GladiusEx:SafeGetSpellName(10060)] = 2, -- Power Infusion
-        [GladiusEx:SafeGetSpellName(12975)] = 2, -- Last Stand
-        [GladiusEx:SafeGetSpellName(14751)] = 2, -- Inner Focus
-        [GladiusEx:SafeGetSpellName(27273)] = 2, -- Sacrifice
-        [GladiusEx:SafeGetSpellName(22812)] = 2, -- Barkskin
-        [GladiusEx:SafeGetSpellName(871)] = 1.9, -- Shield Wall
-        [GladiusEx:SafeGetSpellName(31842)] = 1.5, -- Divine Illumination
-        [GladiusEx:SafeGetSpellName(3034)] = 1.5, -- Viper Sting
-        [GladiusEx:SafeGetSpellName(29166)] = 1.5, -- Innervate
-        [GladiusEx:SafeGetSpellName(54428)] = 1.5, -- Divine Plea
-        [GladiusEx:SafeGetSpellName(45182)] = 1.5, -- Cheating Death
-        [GladiusEx:SafeGetSpellName(6346)] = 1.4, -- Fear Ward
-        [GladiusEx:SafeGetSpellName(2687)] = 1.1, -- Bloodrage
-        [GladiusEx:SafeGetSpellName(12051)] = 1.1, -- Evocation
-        [GladiusEx:SafeGetSpellName(5118)] = 1, -- Aspect of the Cheetah
-        [GladiusEx:SafeGetSpellName(1850)] = 1, -- Dash
-        [GladiusEx:SafeGetSpellName(2983)] = 1, -- Sprint
-        [GladiusEx:SafeGetSpellName(31642)] = 1, -- Blazing Speed
-        [GladiusEx:SafeGetSpellName(20578)] = 0.9, -- Cannibalize
-        [GladiusEx:SafeGetSpellName(3043)] = 0.9, -- Scorpid Sting
-        [GladiusEx:SafeGetSpellName(36554)] = 0.9, -- Shadowstep
-        [GladiusEx:SafeGetSpellName(41425)] = 0.9, -- Hypothermia
-        [GladiusEx:SafeGetSpellName(11426)] = 0.8, -- Ice Barrier
-        [GladiusEx:SafeGetSpellName(1543)] = 0.8, -- Flare
-        [GladiusEx:SafeGetSpellName(34709)] = 0.8, -- Shadow Sight
-        [GladiusEx:SafeGetSpellName(2645)] = 0.5, -- Ghost Wolf
-        --[33891]                            = 0.5, -- Tree of Life (cannot use SafeGetSpellName because there's another aura with the same name that everyone in the team gets)
-        [GladiusEx:SafeGetSpellName(9634)] = 0.5, -- Dire Bear Form
-        [GladiusEx:SafeGetSpellName(768)] = 0.5, -- Cat Form
-        [GladiusEx:SafeGetSpellName(783)] = 0.5, -- Travel Form
-        [GladiusEx:SafeGetSpellName(25771)] = 0.1, -- Forbearance
-        [GladiusEx:SafeGetSpellName(12489)] = 0, -- Improved Cone of Cold
-        [GladiusEx:SafeGetSpellName(29703)] = 0, -- Dazed
-        [GladiusEx:SafeGetSpellName(12323)] = 0, -- Piercing Howl
-        [GladiusEx:SafeGetSpellName(1715)] = 0, -- Hamstring
-        [GladiusEx:SafeGetSpellName(63311)] = 0, -- Shadowsnare
-        [GladiusEx:SafeGetSpellName(18223)] = 0, -- Curse of Exhaustion
-        [GladiusEx:SafeGetSpellName(18118)] = 0, -- Aftermath
-        [GladiusEx:SafeGetSpellName(8034)] = 0, -- Frostbrand Attack
-        [GladiusEx:SafeGetSpellName(8056)] = 0, -- Frost Shock
-        [GladiusEx:SafeGetSpellName(3600)] = 0, -- Earthbind
-        [GladiusEx:SafeGetSpellName(26679)] = 0, -- Deadly Throw
-        [GladiusEx:SafeGetSpellName(3409)] = 0, -- Crippling Poison
-        [GladiusEx:SafeGetSpellName(31125)] = 0, -- Blade Twisting
-        [GladiusEx:SafeGetSpellName(15407)] = 0, -- Mind Flay
-        [GladiusEx:SafeGetSpellName(20170)] = 0, -- Seal of Justice
-        [GladiusEx:SafeGetSpellName(63529)] = 0, -- Dazed  Avenger's Shield
-        [GladiusEx:SafeGetSpellName(31589)] = 0, -- Slow
-        [GladiusEx:SafeGetSpellName(44614)] = 0, -- Frostfire Bolt
-        [GladiusEx:SafeGetSpellName(116)] = 0, -- Frostbolt
-        [GladiusEx:SafeGetSpellName(120)] = 0, -- Cone of Cold
-        [GladiusEx:SafeGetSpellName(6136)] = 0, -- Chilled
-        [GladiusEx:SafeGetSpellName(11113)] = 0, -- Blast Wave
-        [GladiusEx:SafeGetSpellName(50271)] = 0, -- Tendon Rip
-        [GladiusEx:SafeGetSpellName(54644)] = 0, -- Froststorm Breath
-        [GladiusEx:SafeGetSpellName(2974)] = 0, -- Wing Clip
-        [GladiusEx:SafeGetSpellName(61394)] = 0, -- Glyph of Freezing Trap
-        [GladiusEx:SafeGetSpellName(13810)] = 0, -- Frost Trap Aura
-        [GladiusEx:SafeGetSpellName(5116)] = 0, -- Concussive Shot
-        [GladiusEx:SafeGetSpellName(35101)] = 0, -- Concussive Barrage
-        [GladiusEx:SafeGetSpellName(61391)] = 0, -- Typhoon
-        [GladiusEx:SafeGetSpellName(58179)] = 0, -- Infected Wounds
-        [GladiusEx:SafeGetSpellName(50040)] = 0, -- Chilblains
-        [GladiusEx:SafeGetSpellName(55666)] = 0, -- Desecration
-        [GladiusEx:SafeGetSpellName(45524)] = 0, -- Chains of Ice
+        [60210] = 9, -- Freezing Arrow Effect (Rank 1)
+        [9005] = 9, -- Pounce (Rank 1)
+        [9823] = 9, -- Pounce (Rank 2)
+        [9827] = 9, -- Pounce (Rank 3)
+        [27006] = 9, -- Pounce (Rank 4)
+        [49803] = 9, -- Pounce (Rank 5)
+        [22570] = 9, -- Maim (Rank 1)
+        [49802] = 9, -- Maim (Rank 2)
+        [2637] = 9, -- Hibernate (Rank 1)
+        [18657] = 9, -- Hibernate (Rank 2)
+        [18658] = 9, -- Hibernate (Rank 3)
+        [5211] = 9, -- Bash (Rank 1)
+        [6798] = 9, -- Bash (Rank 2)
+        [8983] = 9, -- Bash (Rank 3)
+        [49203] = 9, -- Hungering Cold (Rank 1)
+        [51209] = 9, -- Hungering Cold (aura)
+        [47481] = 9, -- Gnaw
+        [45438] = 8.9, -- Ice Block
+        [642] = 8.9, -- Divine Shield
+        [47585] = 8.9, -- Dispersion
+        [19263] = 8.9, -- Deterrence
+        [46924] = 8.9, -- Bladestorm
+        [19574] = 8.9, -- Bestial Wrath
+        [34692] = 8.9, -- The Beast Within
+        [6940] = 8.8, -- Hand of Sacrifice
+        [64205] = 8.8, -- Divine Sacrifice
+        [31821] = 8.7, -- Aura Mastery
+        [23920] = 8.7, -- Spell Reflection
+        [8178] = 8.7, -- Grounding Totem Effect (Rank 1)
+        [31224] = 8.7, -- Cloak of Shadows
+        [48707] = 8.7, -- Anti-Magic Shell
+        [48792] = 8.6, -- Icebound Fortitude
+        [3411] = 8.6, -- Intervene
+        [1022] = 8.6, -- Hand of Protection (Rank 1)
+        [5599] = 8.6, -- Hand of Protection (Rank 2)
+        [10278] = 8.6, -- Hand of Protection (Rank 3)
+        [49039] = 8.4, -- Lichborne
+        [18499] = 8.4, -- Berserker Rage
+        [50334] = 8.4, -- Berserk
+        [5277] = 8.2, -- Evasion (Rank 1)
+        [26669] = 8.2, -- Evasion (Rank 2)
+        [38031] = 8.2, -- Shield Block
+        [2565] = 8.2, -- Shield Block (player)
+        [20594] = 8.2, -- Stoneform (Racial)
+        [55021] = 7, -- Silenced - Improved Counterspell (Rank 2)
+        [18469] = 7, -- Silenced - Improved Counterspell (Rank 1)
+        [25046] = 7, -- Arcane Torrent (Racial)
+        [18498] = 7, -- Silenced - Gag Order
+        [31117] = 7, -- Unstable Affliction
+        [24259] = 7, -- Spell Lock
+        [18425] = 7, -- Silenced - Improved Kick
+        [1330] = 7, -- Garrote - Silence
+        [15487] = 7, -- Silence
+        [31935] = 7, -- Avenger's Shield (Rank 1)
+        [32699] = 7, -- Avenger's Shield (Rank 2)
+        [32700] = 7, -- Avenger's Shield (Rank 3)
+        [48826] = 7, -- Avenger's Shield (Rank 4)
+        [48827] = 7, -- Avenger's Shield (Rank 5)
+
+        [34490] = 7, -- Silencing Shot
+        [47476] = 7, -- Strangulate
+        [27559] = 7, -- Silence
+        [18708] = 6, -- Fel Domination
+        [1044] = 5.5, -- Hand of Freedom
+        [54216] = 5.5, -- Master's Call
+        [16979] = 5, -- Feral Charge - Bear
+        [16689] = 5, -- Nature's Grasp (Rank 1)
+        [16810] = 5, -- Nature's Grasp (Rank 2)
+        [16811] = 5, -- Nature's Grasp (Rank 3)
+        [16812] = 5, -- Nature's Grasp (Rank 4)
+        [16813] = 5, -- Nature's Grasp (Rank 5)
+        [17329] = 5, -- Nature's Grasp (Rank 6)
+        [27009] = 5, -- Nature's Grasp (Rank 7)
+        [53312] = 5, -- Nature's Grasp (Rank 8)
+        [13099] = 5, -- Net-o-Matic
+        [55536] = 5, -- Frostweave Net
+        [39965] = 5, -- Frost Grenade
+        [23694] = 5, -- Improved Hamstring
+        [58373] = 5, -- Glyph of Hamstring
+        [12494] = 5, -- Frostbite
+        [55080] = 5, -- Shattered Barrier
+        [63685] = 5, -- Freeze
+        [64695] = 5, -- Earthgrab
+        [122] = 5, -- Frost Nova (Rank 1)
+        [865] = 5, -- Frost Nova (Rank 2)
+        [6131] = 5, -- Frost Nova (Rank 3)
+        [10230] = 5, -- Frost Nova (Rank 4)
+        [27088] = 5, -- Frost Nova (Rank 5)
+        [42917] = 5, -- Frost Nova (Rank 6)
+        [33395] = 5, -- Freeze
+        [4167] = 5, -- Web (Rank 1)
+        [54706] = 5, -- Venom Web Spray (Rank 1)
+        [55505] = 5, -- Venom Web Spray (Rank 2)
+        [55506] = 5, -- Venom Web Spray (Rank 3)
+        [55507] = 5, -- Venom Web Spray (Rank 4)
+        [55508] = 5, -- Venom Web Spray (Rank 5)
+        [55509] = 5, -- Venom Web Spray (Rank 6)
+        [50245] = 5, -- Pin (Rank 1)
+        [53544] = 5, -- Pin (Rank 2)
+        [53545] = 5, -- Pin (Rank 3)
+        [53546] = 5, -- Pin (Rank 4)
+        [53547] = 5, -- Pin (Rank 5)
+        [53548] = 5, -- Pin (Rank 6)
+        [19185] = 5, -- Entrapment
+        [19306] = 5, -- Counterattack (Rank 1)
+        [20909] = 5, -- Counterattack (Rank 2)
+        [20910] = 5, -- Counterattack (Rank 3)
+        [27067] = 5, -- Counterattack (Rank 4)
+        [48998] = 5, -- Counterattack (Rank 5)
+        [48999] = 5, -- Counterattack (Rank 6)
+        [45334] = 5, -- Feral Charge Effect
+        [339] = 5, -- Entangling Roots (Rank 1)
+        [1062] = 5, -- Entangling Roots (Rank 2)
+        [5195] = 5, -- Entangling Roots (Rank 3)
+        [5196] = 5, -- Entangling Roots (Rank 4)
+        [9852] = 5, -- Entangling Roots (Rank 5)
+        [9853] = 5, -- Entangling Roots (Rank 6)
+        [26989] = 5, -- Entangling Roots (Rank 7)
+        [53308] = 5, -- Entangling Roots (Rank 8)
+        [676] = 4, -- Disarm
+        [53359] = 4, -- Chimera Shot - Scorpid
+        [51722] = 4, -- Dismantle
+        [64346] = 4, -- Fiery Payback
+        [50541] = 4, -- Snatch (Rank 1)
+        [53537] = 4, -- Snatch (Rank 2)
+        [53538] = 4, -- Snatch (Rank 3)
+        [53540] = 4, -- Snatch (Rank 4)
+        [53542] = 4, -- Snatch (Rank 5)
+        [53543] = 4, -- Snatch (Rank 6)
+        [51271] = 3, -- Unbreakable Armor
+        [12043] = 2.6, -- Presence of Mind
+        [12042] = 2.5, -- Arcane Power
+        [14177] = 2.6, -- Cold Blood
+        [16188] = 2.6, -- Nature's Swiftness
+        [17116] = 2.6, -- Nature's Swiftness
+        [1719] = 2.6, -- Recklessness
+        [5217] = 2.6, -- Tiger's Fury (Rank 1)
+        [6793] = 2.6, -- Tiger's Fury (Rank 2)
+        [9845] = 2.6, -- Tiger's Fury (Rank 3)
+        [9846] = 2.6, -- Tiger's Fury (Rank 4)
+        [50212] = 2.6, -- Tiger's Fury (Rank 5)
+        [50213] = 2.6, -- Tiger's Fury (Rank 6)
+        [29977] = 2.6, -- Combustion
+        [11129] = 2.6, -- Combustion (player)
+        [28682] = 2.6, -- Combustion (critical strike bonus)
+        [16166] = 2.6, -- Elemental Mastery (instant cast)
+        [64701] = 2.6, -- Elemental Mastery (haste)
+        [20216] = 2.6, -- Divine Favor
+        [12292] = 2.5, -- Death Wish
+        [12472] = 2.5, -- Icy Veins
+        [13750] = 2.5, -- Adrenaline Rush
+        [3045] = 2.5, -- Rapid Fire
+        [53201] = 2.5, -- Starfall (Rank 4)
+        [48505] = 2.5, -- Starfall (Rank 1)
+        [53199] = 2.5, -- Starfall (Rank 2)
+        [53200] = 2.5, -- Starfall (Rank 3)
+        [51713] = 2.5, -- Shadow Dance
+        [30823] = 2.5, -- Shamanistic Rage
+        [31884] = 2.5, -- Avenging Wrath
+        [33206] = 2.5, -- Pain Suppression
+        [498] = 2.5, -- Divine Protection
+        [70940] = 2.5, -- Divine Guardian
+        [47788] = 2.5, -- Guardian Spirit
+        [47241] = 2.5, -- Metamorphosis
+        [20572] = 2.5, -- Blood Fury (Racial)
+        [26297] = 2.5, -- Berserking (Racial)
+        [12328] = 2.4, -- Sweeping Strikes
+        [13877] = 2.4, -- Blade Flurry
+        [20230] = 2.4, -- Retaliation
+        [32182] = 0.4, -- Heroism
+        [2825] = 0.4, -- Bloodlust
+        [22842] = 2.1, -- Frenzied Regeneration
+        [55694] = 2.1, -- Enraged Regeneration
+        [55233] = 2.1, -- Vampiric Blood
+        [10060] = 2, -- Power Infusion
+        [12975] = 2, -- Last Stand
+        [14751] = 2, -- Inner Focus
+        [27273] = 2, -- Sacrifice (Rank 7)
+        [7812] = 2, -- Sacrifice (Rank 1)
+        [19438] = 2, -- Sacrifice (Rank 2)
+        [19440] = 2, -- Sacrifice (Rank 3)
+        [19441] = 2, -- Sacrifice (Rank 4)
+        [19442] = 2, -- Sacrifice (Rank 5)
+        [19443] = 2, -- Sacrifice (Rank 6)
+        [47985] = 2, -- Sacrifice (Rank 8)
+        [47986] = 2, -- Sacrifice (Rank 9)
+        [22812] = 2, -- Barkskin
+        [49222] = 2, -- Bone Shield
+        [61336] = 2, -- Survival Instincts
+        [871] = 1.9, -- Shield Wall
+        [31842] = 1.5, -- Divine Illumination
+        [3034] = 1.5, -- Viper Sting
+        [29166] = 1.5, -- Innervate
+        [54428] = 1.5, -- Divine Plea
+        [45182] = 1.5, -- Cheating Death
+        [6346] = 1.4, -- Fear Ward
+        [2687] = 1.1, -- Bloodrage
+        [12051] = 1.1, -- Evocation
+        [5118] = 1, -- Aspect of the Cheetah
+        [1850] = 1, -- Dash (Rank 1)
+        [9821] = 1, -- Dash (Rank 2)
+        [33357] = 1, -- Dash (Rank 3)
+        [2983] = 1, -- Sprint (Rank 1)
+        [8696] = 1, -- Sprint (Rank 2)
+        [11305] = 1, -- Sprint (Rank 3)
+        [31642] = 1, -- Blazing Speed (Rank 2)
+        [20578] = 0.9, -- Cannibalize
+        [3043] = 0.9, -- Scorpid Sting
+        [36554] = 0.9, -- Shadowstep
+        [41425] = 0.9, -- Hypothermia
+        [11426] = 0.8, -- Ice Barrier (Rank 1)
+        [13031] = 0.8, -- Ice Barrier (Rank 2)
+        [13032] = 0.8, -- Ice Barrier (Rank 3)
+        [13033] = 0.8, -- Ice Barrier (Rank 4)
+        [27134] = 0.8, -- Ice Barrier (Rank 5)
+        [33405] = 0.8, -- Ice Barrier (Rank 6)
+        [43038] = 0.8, -- Ice Barrier (Rank 7)
+        [43039] = 0.8, -- Ice Barrier (Rank 8)
+        [1543] = 0.8, -- Flare
+        [34709] = 0.8, -- Shadow Sight
+        [2645] = 0.5, -- Ghost Wolf
+        -- [33891] = 0.5, -- Tree of Life (disabled)
+        [9634] = 0.5, -- Dire Bear Form (Shapeshift)
+        [768] = 0.5, -- Cat Form (Shapeshift)
+        [783] = 0.5, -- Travel Form (Shapeshift)
+        [25771] = 0.1, -- Forbearance
+        [12489] = 0, -- Improved Cone of Cold (Rank 2)
+        [29703] = 0, -- Dazed
+        [12323] = 0, -- Piercing Howl
+        [1715] = 0, -- Hamstring
+        [63311] = 0, -- Glyph of Shadowflame
+        [18223] = 0, -- Curse of Exhaustion
+        [18118] = 0, -- Aftermath
+        [8034] = 0, -- Frostbrand Attack (Rank 1)
+        [8037] = 0, -- Frostbrand Attack (Rank 2)
+        [10458] = 0, -- Frostbrand Attack (Rank 3)
+        [16352] = 0, -- Frostbrand Attack (Rank 4)
+        [16353] = 0, -- Frostbrand Attack (Rank 5)
+        [25501] = 0, -- Frostbrand Attack (Rank 6)
+        [58797] = 0, -- Frostbrand Attack (Rank 7)
+        [58798] = 0, -- Frostbrand Attack (Rank 8)
+        [58799] = 0, -- Frostbrand Attack (Rank 9)
+        [8056] = 0, -- Frost Shock (Rank 1)
+        [8058] = 0, -- Frost Shock (Rank 2)
+        [10472] = 0, -- Frost Shock (Rank 3)
+        [10473] = 0, -- Frost Shock (Rank 4)
+        [25464] = 0, -- Frost Shock (Rank 5)
+        [49235] = 0, -- Frost Shock (Rank 6)
+        [49236] = 0, -- Frost Shock (Rank 7)
+        [3600] = 0, -- Earthbind
+        [26679] = 0, -- Deadly Throw (Rank 1)
+        [48673] = 0, -- Deadly Throw (Rank 2)
+        [48674] = 0, -- Deadly Throw (Rank 3)
+        [3409] = 0, -- Crippling Poison
+        [31125] = 0, -- Blade Twisting
+        [15407] = 0, -- Mind Flay (Rank 1)
+        [17311] = 0, -- Mind Flay (Rank 2)
+        [17312] = 0, -- Mind Flay (Rank 3)
+        [17313] = 0, -- Mind Flay (Rank 4)
+        [17314] = 0, -- Mind Flay (Rank 5)
+        [18807] = 0, -- Mind Flay (Rank 6)
+        [25387] = 0, -- Mind Flay (Rank 7)
+        [48155] = 0, -- Mind Flay (Rank 8)
+        [48156] = 0, -- Mind Flay (Rank 9)
+        [20170] = 0, -- Stun
+        [63529] = 0, -- Silenced - Shield of the Templar
+        [31589] = 0, -- Slow
+        [44614] = 0, -- Frostfire Bolt (Rank 1)
+        [47610] = 0, -- Frostfire Bolt (Rank 2)
+        [116] = 0, -- Frostbolt (Rank 1)
+        [205] = 0, -- Frostbolt (Rank 2)
+        [837] = 0, -- Frostbolt (Rank 3)
+        [7322] = 0, -- Frostbolt (Rank 4)
+        [8406] = 0, -- Frostbolt (Rank 5)
+        [8407] = 0, -- Frostbolt (Rank 6)
+        [8408] = 0, -- Frostbolt (Rank 7)
+        [10179] = 0, -- Frostbolt (Rank 8)
+        [10180] = 0, -- Frostbolt (Rank 9)
+        [10181] = 0, -- Frostbolt (Rank 10)
+        [25304] = 0, -- Frostbolt (Rank 11)
+        [27071] = 0, -- Frostbolt (Rank 12)
+        [27072] = 0, -- Frostbolt (Rank 13)
+        [38697] = 0, -- Frostbolt (Rank 14)
+        [42841] = 0, -- Frostbolt (Rank 15)
+        [42842] = 0, -- Frostbolt (Rank 16)
+        [120] = 0, -- Cone of Cold (Rank 1)
+        [8492] = 0, -- Cone of Cold (Rank 2)
+        [10159] = 0, -- Cone of Cold (Rank 3)
+        [10160] = 0, -- Cone of Cold (Rank 4)
+        [10161] = 0, -- Cone of Cold (Rank 5)
+        [27087] = 0, -- Cone of Cold (Rank 6)
+        [42930] = 0, -- Cone of Cold (Rank 7)
+        [42931] = 0, -- Cone of Cold (Rank 8)
+        [6136] = 0, -- Chilled (Rank 1)
+        [11113] = 0, -- Blast Wave (Rank 1)
+        [13018] = 0, -- Blast Wave (Rank 2)
+        [13019] = 0, -- Blast Wave (Rank 3)
+        [13020] = 0, -- Blast Wave (Rank 4)
+        [13021] = 0, -- Blast Wave (Rank 5)
+        [27133] = 0, -- Blast Wave (Rank 6)
+        [33933] = 0, -- Blast Wave (Rank 7)
+        [42944] = 0, -- Blast Wave (Rank 8)
+        [42945] = 0, -- Blast Wave (Rank 9)
+        [50271] = 0, -- Tendon Rip (Rank 1)
+        [53571] = 0, -- Tendon Rip (Rank 2)
+        [53572] = 0, -- Tendon Rip (Rank 3)
+        [53573] = 0, -- Tendon Rip (Rank 4)
+        [53574] = 0, -- Tendon Rip (Rank 5)
+        [53575] = 0, -- Tendon Rip (Rank 6)
+        [54644] = 0, -- Froststorm Breath (Rank 1)
+        [55488] = 0, -- Froststorm Breath (Rank 2)
+        [55489] = 0, -- Froststorm Breath (Rank 3)
+        [55490] = 0, -- Froststorm Breath (Rank 4)
+        [55491] = 0, -- Froststorm Breath (Rank 5)
+        [55492] = 0, -- Froststorm Breath (Rank 6)
+        [2974] = 0, -- Wing Clip
+        [61394] = 0, -- Glyph of Freezing Trap
+        [13810] = 0, -- Frost Trap Aura
+        [5116] = 0, -- Concussive Shot
+        [35101] = 0, -- Concussive Barrage
+        [61391] = 0, -- Typhoon (Rank 1)
+        [53227] = 0, -- Typhoon (Rank 5)
+        [61387] = 0, -- Typhoon (Rank 4)
+        [61388] = 0, -- Typhoon (Rank 3)
+        [61390] = 0, -- Typhoon (Rank 2)
+        [58179] = 0, -- Infected Wounds
+        [58180] = 0, -- Infected Wounds
+        [58181] = 0, -- Infected Wounds
+        [50040] = 0, -- Chilblains (Rank 1)
+        [55666] = 0, -- Desecration (Rank 1)
+        [45524] = 0, -- Chains of Ice
     }
 end
 
@@ -263,6 +506,37 @@ ClassIcon = GladiusEx:NewGladiusExModule("ClassIcon",
     fn.merge(defaults, {
         classIconPosition = "RIGHT",
     }))
+
+-- Migrate saved name overrides before AceDB fills in the new numeric defaults.
+-- Keep user-created name rules and explicit IDs, including false deletion markers.
+function ClassIcon:OnInitialize()
+    local namespaces = GladiusEx.dbi.sv.namespaces or {}
+    for _, namespace in ipairs({"ClassIcon", "party_ClassIcon"}) do
+        local saved = namespaces[namespace]
+        for _, profile in pairs(saved and saved.profiles or {}) do
+            if not profile.classIconAurasUseIDs then
+                local auras = profile.classIconAuras
+                if auras then
+                    for id in pairs(self.defaults_arena.classIconAuras) do
+                        local name = GetSpellInfo(id)
+                        if name and auras[name] ~= nil and auras[id] == nil then
+                            auras[id] = auras[name]
+                        end
+                    end
+                end
+                profile.classIconAurasUseIDs = true
+            end
+        end
+    end
+    self.super.OnInitialize(self)
+    self.dbi_arena.profile.classIconAurasUseIDs = true
+    self.dbi_party.profile.classIconAurasUseIDs = true
+end
+
+function ClassIcon:OnProfileChanged(event, database)
+    self.super.OnProfileChanged(self)
+    if database then database.profile.classIconAurasUseIDs = true end
+end
 
 function ClassIcon:OnEnable()
     self:RegisterEvent("UNIT_AURA")
@@ -627,25 +901,10 @@ function ClassIcon:GetImportantAura(unit, name, spellid)
     return auras[name]
 end
 
-local function ParseAura(value)
-    value = value:match("^%s*(.-)%s*$")
-    if value == "" then return nil end
-    local id = tonumber(value)
-    if id then
-        if id > 0 and id < math.huge and id % 1 == 0 then return id end
-        return nil
-    end
-    return GetSpellInfo(value) or value
-end
-
-local function ValidateAura(info, value)
-    return ParseAura(value) ~= nil or L["Enter a spell name or a positive whole spell ID."]
-end
-
 local function AuraOptionKey(aura)
     -- AceConfig requires string keys; keep numeric IDs distinct from saved names
     -- and from the newAura controls, without changing the profile's keys.
-    return type(aura) .. ":" .. tostring(aura)
+    return GladiusEx:SpellRuleKey(aura)
 end
 
 function ClassIcon:GetOptions(unit)
@@ -778,17 +1037,6 @@ function ClassIcon:GetOptions(unit)
                     inline = true,
                     order = 1,
                     args = {
-                        name = {
-                            type = "input",
-                            -- Spell completion widgets can replace an ID with its name.
-                            name = L["Spell name or ID"],
-                            desc = L["Enter an aura name or an exact numeric spell ID."],
-                            validate = ValidateAura,
-                            get = function() return self.newAuraName and tostring(self.newAuraName) or "" end,
-                            set = function(info, value) self.newAuraName = ParseAura(value) end,
-                            disabled = function() return not self:IsUnitEnabled(unit) end,
-                            order = 1,
-                        },
                         priority = {
                             type= "range",
                             name = L["Priority"],
@@ -804,14 +1052,6 @@ function ClassIcon:GetOptions(unit)
                         add = {
                             type = "execute",
                             name = L["Add new aura"],
-                            func = function(info)
-                                if not self.newAuraName or not self.newAuraPriority then return end
-                                self.db[unit].classIconAuras[self.newAuraName] = self.newAuraPriority
-                                options.auraList.args[AuraOptionKey(self.newAuraName)] = self:SetupAuraOptions(options, unit, self.newAuraName)
-                                self.newAuraName = nil
-                                GladiusEx:UpdateFrames()
-                            end,
-                            disabled = function() return not self:IsUnitEnabled(unit) or not (self.newAuraName and self.newAuraPriority) end,
                             order = 3,
                         },
                     },
@@ -830,76 +1070,33 @@ function ClassIcon:GetOptions(unit)
         end
     end
 
+    GladiusEx:ConfigureNewSpellRule(self, unit, "classIconAuras", options.auraList.args,
+        options.auraList.args.newAura.args,
+        function() return self.newAuraPriority end,
+        function(aura) return self:SetupAuraOptions(options, unit, aura) end,
+        function() return not self:IsUnitEnabled(unit) end)
     return options
 end
 
 function ClassIcon:SetupAuraOptions(options, unit, aura)
-    local function setAura(info, value)
-        if (info[#(info)] == "name") then
-            value = ParseAura(value)
-            if not value or aura == value then return end
-
-            -- create new aura
-            self.db[unit].classIconAuras[value] = self.db[unit].classIconAuras[aura]
-            options.auraList.args[AuraOptionKey(value)] = self:SetupAuraOptions(options, unit, value)
-
-            -- Keep an explicit override so AceDB does not restore the default.
-            self.db[unit].classIconAuras[aura] = false
-            options.auraList.args[AuraOptionKey(aura)] = nil
-        else
-            self.db[unit].classIconAuras[aura] = value
-        end
-
-        GladiusEx:UpdateFrames()
-    end
-
-    local function getAura(info)
-        if (info[#(info)] == "name") then
-            return tostring(aura)
-        else
-            return self.db[unit].classIconAuras[aura]
-        end
-    end
-
-    local label = aura
-    if type(aura) == "number" then
-        label = (GetSpellInfo(aura) or L["Spell ID"]) .. " (" .. aura .. ")"
-    end
-    return {
-        type = "group",
-        name = label,
-        desc = label,
-        get = getAura,
-        set = setAura,
+    local group = {
+        type = "group", name = tostring(aura),
         disabled = function() return not self:IsUnitEnabled(unit) end,
         args = {
-            name = {
-                type = "input",
-                name = L["Spell name or ID"],
-                desc = L["Enter an aura name or an exact numeric spell ID."],
-                validate = ValidateAura,
-                disabled = function() return not self:IsUnitEnabled(unit) end,
-                order = 1,
-            },
             priority = {
-                type= "range",
-                name = L["Priority"],
+                type = "range", name = L["Priority"],
                 desc = L["Select what priority the aura should have - higher equals more priority"],
-                min = 0, softMax = 10, step = 0.1,
-                order = 2,
-            },
-            delete = {
-                type = "execute",
-                name = L["Delete"],
-                func = function(info)
-                    -- nil would allow AceDB to restore a default aura on reload.
-                    self.db[unit].classIconAuras[aura] = false
-                    options.auraList.args[AuraOptionKey(aura)] = nil
+                min = 0, softMax = 10, step = 0.1, order = 2,
+                get = function() return self.db[unit].classIconAuras[aura] end,
+                set = function(info, value)
+                    self.db[unit].classIconAuras[aura] = value
                     GladiusEx:UpdateFrames()
                 end,
-                disabled = function() return not self:IsUnitEnabled(unit) end,
-                order = 3,
             },
+            delete = {type = "execute", name = L["Delete"], order = 3},
         },
     }
+    return GladiusEx:ConfigureSpellRule(self, unit, "classIconAuras", options.auraList.args,
+        aura, group, function(key) return self:SetupAuraOptions(options, unit, key) end,
+        function() return not self:IsUnitEnabled(unit) end)
 end

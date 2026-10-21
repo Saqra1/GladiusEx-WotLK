@@ -149,15 +149,15 @@ function Auras:GetModuleAttachFrame(unit, point)
     end
 end
 
-function Auras:IsAuraFiltered(unit, name, what)
+function Auras:IsAuraFiltered(unit, name, what, spellID)
     if self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED then
         return true
     elseif band(self.db[unit].aurasFilterWhat, what) ~= what then
         return true
     elseif self.db[unit].aurasFilterType == FILTER_TYPE_WHITELIST then
-        return self.db[unit].aurasFilterAuras[name]
+        return GladiusEx:GetSpellRule(self.db[unit], "aurasFilterAuras", name, spellID)
     elseif self.db[unit].aurasFilterType == FILTER_TYPE_BLACKLIST then
-        return not self.db[unit].aurasFilterAuras[name]
+        return not GladiusEx:GetSpellRule(self.db[unit], "aurasFilterAuras", name, spellID)
     end
 end
 
@@ -255,7 +255,7 @@ function Auras:UpdateUnitAuras(event, unit)
 
             if not name then break end
 
-            if self:IsAuraFiltered(unit, name, filter_what) and
+            if self:IsAuraFiltered(unit, name, filter_what, spellID) and
                 (not aurasBuffsOnlyMine or player_units[caster]) and
                 (not aurasBuffsOnlyDispellable or LD:CanDispel(unit, buffs, dispelType, spellID)) then
                 if aurasBuffsEnlargeMine and ((testing and i <= 2) or (not testing and player_units[caster])) then
@@ -667,10 +667,6 @@ end
 
 function Auras:Test(unit)
     self:UpdateUnitAuras("Test", unit)
-end
-
-local function HasAuraEditBox()
-    return not not LibStub("AceGUI-3.0").WidgetVersions["Aura_EditBox"]
 end
 
 function Auras:GetOptions(unit)
@@ -1153,26 +1149,9 @@ function Auras:GetOptions(unit)
                     inline = true,
                     order = 3,
                     args = {
-                        name = {
-                            type = "input",
-                            dialogControl = HasAuraEditBox() and "Aura_EditBox" or nil,
-                            name = L["Name"],
-                            desc = L["Name of the aura"],
-                            get = function() return self.newAuraName or "" end,
-                            set = function(info, value) self.newAuraName = GetSpellInfo(value) or value end,
-                            disabled = function() return not self:IsUnitEnabled(unit) or self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED end,
-                            order = 1,
-                        },
                         add = {
                             type = "execute",
                             name = L["Add new aura filter"],
-                            func = function(info)
-                                self.db[unit].aurasFilterAuras[self.newAuraName] = true
-                                options.filters.args[self.newAuraName] = self:SetupAuraOptions(options, unit, self.newAuraName)
-                                self.newAuraName = nil
-                                GladiusEx:UpdateFrames()
-                            end,
-                            disabled = function() return not self:IsUnitEnabled(unit) or not self.newAuraName or self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED end,
                             order = 3,
                         },
                     },
@@ -1182,69 +1161,23 @@ function Auras:GetOptions(unit)
     }
 
     -- setup auras
-    for aura in pairs(self.db[unit].aurasFilterAuras) do
-        options.filters.args[aura] = self:SetupAuraOptions(options, unit, aura)
+    for aura, enabled in pairs(self.db[unit].aurasFilterAuras) do
+        if enabled then options.filters.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura) end
     end
+    GladiusEx:ConfigureNewSpellRule(self, unit, "aurasFilterAuras", options.filters.args,
+        options.filters.args.newAura.args, function() return true end,
+        function(aura) return self:SetupAuraOptions(options, unit, aura) end,
+        function() return not self:IsUnitEnabled(unit) or self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED end)
 
     return options
 end
 
 function Auras:SetupAuraOptions(options, unit, aura)
-    local function setAura(info, value)
-        if (info[#(info)] == "name") then
-            local old_name = info[#(info) - 1]
-
-            -- create new aura
-            self.db[unit].aurasFilterAuras[value] = true
-            options.filters.args[value] = self:SetupAuraOptions(options, unit, value)
-
-            -- delete old aura
-            self.db[unit].aurasFilterAuras[old_name] = nil
-            options.filters.args[old_name] = nil
-        else
-            self.db[unit].aurasFilterAuras[info[#(info) - 1]] = value
-        end
-
-        GladiusEx:UpdateFrames()
-    end
-
-    local function getAura(info)
-        if (info[#(info)] == "name") then
-            return info[#(info) - 1]
-        else
-            return self.db[unit].aurasFilterAuras[info[#(info) - 1]]
-        end
-    end
-
-    return {
-        type = "group",
-        name = aura,
-        desc = aura,
-        get = getAura,
-        set = setAura,
-        disabled = function() return not self:IsUnitEnabled(unit) end,
-        args = {
-            name = {
-                type = "input",
-                dialogControl = HasAuraEditBox() and "Aura_EditBox" or nil,
-                name = L["Name"],
-                desc = L["Name of the aura"],
-                disabled = function() return not self:IsUnitEnabled(unit)  or self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED end,
-                order = 1,
-            },
-            delete = {
-                type = "execute",
-                name = L["Delete"],
-                func = function(info)
-                    local aura = info[#(info) - 1]
-                    self.db[unit].aurasFilterAuras[aura] = nil
-                    options.filters.args[aura] = nil
-
-                    GladiusEx:UpdateFrames()
-                end,
-                disabled = function() return not self:IsUnitEnabled(unit) or self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED end,
-                order = 3,
-            },
-        },
+    local disabled = function() return not self:IsUnitEnabled(unit) or self.db[unit].aurasFilterType == FILTER_TYPE_DISABLED end
+    local group = {
+        type = "group", name = tostring(aura), disabled = disabled,
+        args = {delete = {type = "execute", name = L["Delete"], order = 3, disabled = disabled}},
     }
+    return GladiusEx:ConfigureSpellRule(self, unit, "aurasFilterAuras", options.filters.args,
+        aura, group, function(key) return self:SetupAuraOptions(options, unit, key) end, disabled)
 end
