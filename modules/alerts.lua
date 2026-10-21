@@ -717,12 +717,16 @@ function Alerts:GetOptions(unit)
 
     -- setup casts
     for cast, rule in pairs(self.db[unit].castsSpells) do
-        if rule and not rule.disabled then options.casts.args[GladiusEx:SpellRuleKey(cast)] = self:SetupCastOptions(options, unit, cast) end
+        if rule and not rule.disabled and GladiusEx:SpellRuleOwner(self.db[unit], "castsSpells", cast) == cast then
+            options.casts.args[GladiusEx:SpellRuleKey(cast)] = self:SetupCastOptions(options, unit, cast)
+        end
     end
 
     -- setup auras
     for aura, rule in pairs(self.db[unit].aurasSpells) do
-        if rule and not rule.disabled then options.auras.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura) end
+        if rule and not rule.disabled and GladiusEx:SpellRuleOwner(self.db[unit], "aurasSpells", aura) == aura then
+            options.auras.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura)
+        end
     end
     GladiusEx:ConfigureNewSpellRule(self, unit, "castsSpells", options.casts.args,
         options.casts.args.newCast.args,

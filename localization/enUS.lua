@@ -7,6 +7,14 @@ L["Done"] = true
 L["Unlock to drag groups or edit their X/Y coordinates."] = true
 
 -- Important auras
+L["Spell IDs"] = true
+L["Check Spell IDs"] = true
+L["%s (%d IDs)"] = true
+L["Optional. Separate IDs with commas. Leave Check Spell IDs off to match by name."] = true
+L["Enter positive whole spell IDs separated by commas, or leave it empty."] = true
+L["Every spell ID must have the same spell name."] = true
+L["Match any listed spell ID. Leave unchecked to match all spells with this name."] = true
+L["Names match all ranks and effects with that name. Check Spell IDs matches any listed ID and overrides name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."] = true
 L["Check Spell ID"] = true
 L["Optional. Entering an ID alone keeps name matching enabled."] = true
 L["Enter a positive whole spell ID, or leave it empty."] = true

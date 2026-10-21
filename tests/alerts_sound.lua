@@ -153,6 +153,37 @@ test("sound-only aura alerts never flash and sound again after reapplication", f
     equal(state.flashStarts, 0, "reapplication still does not flash")
 end)
 
+test("comma-separated aura IDs share sound and flashing controls without duplicate sounds", function()
+    local state, alerts = setup()
+    local options = alerts:GetOptions("arena")
+    local input = options.auras.args.newAura.args
+    input.name.set({}, "Wyvern Sting")
+    input.spellID.set({}, "49010, 24131")
+    input.checkSpellID.set({}, true)
+    input.add.func({})
+    local controls = options.auras.args["number:49010"].args
+    controls.sound.set({}, soundName)
+    controls.flash.set({}, false)
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 24131}}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 1, "non-first ID uses the configured sound")
+    equal(state.flashStarts, 0, "non-first ID obeys the flashing toggle")
+    state.auras.HARMFUL[2] = {name = "Wyvern Sting", id = 49010}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 1, "another listed ID does not duplicate the active alert sound")
+    controls.flash.set({}, true)
+    assert(state.flashes.arena1, "flashing can be enabled for the group while active")
+    state.auras.HARMFUL[2] = nil
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 1, "the remaining ID keeps the same active alert")
+    state.auras.HARMFUL = {}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(state.flashes.arena1, nil, "last removal stops the flash")
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 24131}}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 2, "reapplication plays the group sound again")
+end)
+
 test("sound-only auras do not override or hide other flashing alerts", function()
     local state, alerts = setup()
     alerts.db.arena.aurasSpells[49010] = {priority = 50, color = color, sound = soundName, flash = false}

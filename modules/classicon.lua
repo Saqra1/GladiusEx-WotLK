@@ -23,7 +23,7 @@ local UnitIsConnected = Spectate and Spectate.UnitIsConnected or UnitIsConnected
 -- Nonetheless, if you think that we missed an important aura, please post it on the addon site at curse or wowace
 local function GetDefaultImportantAuras()
     return {
-        -- Exact spell ID = priority (higher = more priority). Ranks are listed separately.
+        -- Exact spell ID = priority. Ranks with the same settings share one UI entry.
         [44166] = 9.4, -- Refreshment
         [46755] = 9.4, -- Drink
         [27089] = 9.4, -- Drink
@@ -531,11 +531,23 @@ function ClassIcon:OnInitialize()
     self.super.OnInitialize(self)
     self.dbi_arena.profile.classIconAurasUseIDs = true
     self.dbi_party.profile.classIconAurasUseIDs = true
+    self:GroupAuraRules()
+end
+
+function ClassIcon:GroupAuraRules()
+    for _, unit in ipairs({"arena", "party"}) do
+        local profile = self.db[unit]
+        if not profile.classIconAurasGrouped then
+            GladiusEx:GroupImportantSpellRules(profile, "classIconAuras")
+            profile.classIconAurasGrouped = true
+        end
+    end
 end
 
 function ClassIcon:OnProfileChanged(event, database)
     self.super.OnProfileChanged(self)
     if database then database.profile.classIconAurasUseIDs = true end
+    self:GroupAuraRules()
 end
 
 function ClassIcon:OnEnable()
@@ -893,12 +905,8 @@ function ClassIcon:Test(unit)
 end
 
 function ClassIcon:GetImportantAura(unit, name, spellid)
-    local auras = self.db[unit].classIconAuras
-    local priority = spellid and auras[spellid]
-    -- Exact IDs override names, including priority 0. A deleted ID rule (false)
-    -- falls back to the name; keep false values in the profile for AceDB.
-    if type(priority) == "number" then return priority end
-    return auras[name]
+    local priority = GladiusEx:GetSpellRule(self.db[unit], "classIconAuras", name, spellid)
+    return priority
 end
 
 local function AuraOptionKey(aura)
@@ -1027,7 +1035,7 @@ function ClassIcon:GetOptions(unit)
             args = {
                 matching = {
                     type = "description",
-                    name = L["Names match all ranks and effects with that name. Numeric IDs match only that exact spell and override name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."],
+                    name = L["Names match all ranks and effects with that name. Check Spell IDs matches any listed ID and overrides name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."],
                     order = 0,
                 },
                 newAura = {
@@ -1065,7 +1073,7 @@ function ClassIcon:GetOptions(unit)
 
     -- setup auras
     for aura, priority in pairs(self.db[unit].classIconAuras) do
-        if priority then
+        if priority and GladiusEx:SpellRuleOwner(self.db[unit], "classIconAuras", aura) == aura then
             options.auraList.args[AuraOptionKey(aura)] = self:SetupAuraOptions(options, unit, aura)
         end
     end

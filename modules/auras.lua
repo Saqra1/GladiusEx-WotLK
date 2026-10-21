@@ -1162,7 +1162,9 @@ function Auras:GetOptions(unit)
 
     -- setup auras
     for aura, enabled in pairs(self.db[unit].aurasFilterAuras) do
-        if enabled then options.filters.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura) end
+        if enabled and GladiusEx:SpellRuleOwner(self.db[unit], "aurasFilterAuras", aura) == aura then
+            options.filters.args[GladiusEx:SpellRuleKey(aura)] = self:SetupAuraOptions(options, unit, aura)
+        end
     end
     GladiusEx:ConfigureNewSpellRule(self, unit, "aurasFilterAuras", options.filters.args,
         options.filters.args.newAura.args, function() return true end,

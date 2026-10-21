@@ -22,7 +22,9 @@ local newDebuffs = {
 local auraAliases = {[53562] = "Ravage", [64701] = "Elemental Mastery"}
 local castNames = {
     [2060] = "Greater Heal", [8936] = "Regrowth", [50464] = "Nourish",
-    [118] = "Polymorph", [12826] = "Polymorph", [5782] = "Fear", [51514] = "Hex",
+    [118] = "Polymorph", [12824] = "Polymorph", [12825] = "Polymorph", [12826] = "Polymorph",
+    [28271] = "Polymorph", [28272] = "Polymorph",
+    [5782] = "Fear", [6213] = "Fear", [6215] = "Fear", [51514] = "Hex",
     [20066] = "Repentance", [33786] = "Cyclone", [1513] = "Scare Beast",
     [339] = "Entangling Roots", [2637] = "Hibernate",
 }
