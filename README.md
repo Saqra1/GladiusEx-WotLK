@@ -54,6 +54,7 @@ Run regression checks from the addon directory with Lua 5.1:
 ```sh
 lua tests/dual_spec.lua
 lua tests/enemy_status.lua
+lua tests/arena_roster.lua
 ```
 
 The dual-spec test accepts optional LibDualSpec and AceDB file paths to check

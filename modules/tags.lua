@@ -957,6 +957,7 @@ local function GetDisplayName(unit)
     if not GladiusEx:IsArenaUnit(unit) or GladiusEx:IsTesting(unit) then
         return name or unit, true
     end
+    if GladiusEx:IsFriendlyArenaUnit(unit) then return "unknown", false end
 
     local button = GladiusEx.buttons[unit]
     if name and name ~= UNKNOWN and name ~= "" then

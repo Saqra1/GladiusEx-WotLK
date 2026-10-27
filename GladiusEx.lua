@@ -503,7 +503,7 @@ function GladiusEx:GetArenaSize(min_size)
     
     local seen_enemy_units = 0
     for i = 1, 5 do
-        if UnitExists("arena"..i) then
+        if UnitExists("arena"..i) and not self:IsFriendlyArenaUnit("arena"..i) then
             seen_enemy_units = seen_enemy_units + 1
         end
     end
@@ -526,7 +526,8 @@ end
 
 function GladiusEx:CheckArenaSize(unit)
     local min_size = 0
-    if unit and (self:IsTesting() or self:IsSpectating() or UnitExists(unit)) then
+    if unit and not self:IsFriendlyArenaUnit(unit)
+        and (self:IsTesting() or self:IsSpectating() or UnitExists(unit)) then
         min_size = self:GetUnitIndex(unit)
     end
 
@@ -717,6 +718,7 @@ function GladiusEx:HideFrames()
         button.feignDeath = nil
         button.guid = nil
         button.knownName = nil
+        button.rejectedFriendly = nil
 
         -- hide frame
         self:HideUnit(unit)
@@ -803,6 +805,10 @@ function GladiusEx:ARENA_OPPONENT_UPDATE(event, unit, type)
     log("ARENA_OPPONENT_UPDATE", unit, type)
     -- ignore pets
     if not self:IsArenaUnit(unit) then return end
+    if self:IsFriendlyArenaUnit(unit) then
+        self:UpdateUnitGUID(event, unit)
+        return
+    end
 
     if type == "seen" then
         self:ShowUnit(unit)
@@ -823,6 +829,7 @@ function GladiusEx:ARENA_OPPONENT_UPDATE(event, unit, type)
 end
 
 function GladiusEx:IdentifyUnitClass(unit, skipRefresh)
+    if self:IsFriendlyArenaUnit(unit) then return end
     if self.buttons[unit] and not self.buttons[unit].class and UnitExists(unit) and UnitClass(unit) then
         local _, class = UnitClass(unit)
         self.buttons[unit].class = class
@@ -856,7 +863,7 @@ function GladiusEx:IdentifyUnitSpecialization(event, unit, guid, specID)
 		unit = "player"
 	end
 
-	if not unit or not self.buttons[unit] then return end
+	if not unit or not self.buttons[unit] or self:IsFriendlyArenaUnit(unit) then return end
 
 	if not specID then
 		specID = LSD:GetSpecID(guid)
@@ -959,18 +966,28 @@ function GladiusEx:UpdateUnitGUID(event, unit)
         -- add guid
         local guid = UnitGUID(unit)
         local button = self.buttons[unit]
-        if guid and button then
-            if button.guid and button.guid ~= guid then
+        local friendly = self:IsFriendlyArenaUnit(unit)
+        if button then
+            if (friendly and not button.rejectedFriendly) or (guid and button.guid and button.guid ~= guid) then
                 button.class = nil
                 button.specID = nil
                 button.knownName = nil
                 button.confirmedDead = nil
                 button.feignDeath = nil
                 button.unit_state = nil
+                button.guid = nil
                 self:SendMessage("GLADIUSEX_SPEC_UPDATE", unit)
             end
-            button.guid = guid
+            if friendly then
+                button.rejectedFriendly = true
+                self:HideUnit(unit)
+            elseif guid then
+                button.guid = guid
+            end
         end
+        -- Arena tokens can still refer to a current teammate while zoning.
+        -- Do not let an enemy slot replace that teammate's party GUID lookup.
+        if friendly then return end
         guid = guid and guid or unit -- fix for Spectator mode (in which case unit would be a guid itself)
         
         if guid then
@@ -1013,6 +1030,10 @@ end
 function GladiusEx:UpdateUnitState(unit, reason)
     local button = self.buttons[unit]
     if not button then return end
+    if self:IsFriendlyArenaUnit(unit) then
+        self:UpdateUnitGUID("UpdateUnitState", unit)
+        return
+    end
     local previousState = button.unit_state
     local unitExists = UnitExists(unit)
     local isDead = unitExists and UnitIsDeadOrGhost(unit)
@@ -1086,6 +1107,19 @@ function GladiusEx:IsPartyUnit(unit)
     return party_units[unit]
 end
 
+function GladiusEx:IsFriendlyArenaUnit(unit)
+    if not arena_units[unit] or self:IsTesting() or self:IsSpectating() then return false end
+    local guid = UnitGUID(unit)
+    if not guid then return false end
+
+    -- Compare identities, not faction or attackability: arena opponents may
+    -- share our faction or temporarily become friendly through crowd control.
+    for member in pairs(party_units) do
+        if UnitGUID(member) == guid then return true end
+    end
+    return false
+end
+
 function GladiusEx:ShouldDisplayUnitAsDead(unit)
     local button = self.buttons[unit]
     return button and button.unit_state == STATE_DEAD
@@ -1118,6 +1152,14 @@ end
 
 function GladiusEx:RefreshUnit(unit)
     if not self.buttons[unit] or self:IsTesting(unit) then return end
+    if self:IsFriendlyArenaUnit(unit) then
+        self:UpdateUnitGUID("RefreshUnit", unit)
+        return
+    end
+    if self.buttons[unit].rejectedFriendly then
+        self:UpdateUnitGUID("RefreshUnit", unit)
+        self:ShowUnit(unit)
+    end
 
     if not self.buttons[unit].class then
         self:IdentifyUnitClass(unit, true)
@@ -1138,6 +1180,11 @@ end
 function GladiusEx:ShowUnit(unit)
     log("ShowUnit", unit)
     if not self.buttons[unit] then return end
+    if self:IsFriendlyArenaUnit(unit) then
+        self:UpdateUnitGUID("ShowUnit", unit)
+        return
+    end
+    self.buttons[unit].rejectedFriendly = nil
 
     -- show modules
     for n, m in self:IterateModules() do
