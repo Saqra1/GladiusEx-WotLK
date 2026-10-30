@@ -19,6 +19,7 @@ local function setup()
     UnitHealthMax = function() return health.maximum end
     UnitIsDeadOrGhost = function() return health.dead end
     local state = harness.setup(nil, true)
+    state.addon.buttons = {}
     GetLocale = function() return "enUS" end
     local path = "libs/LibSharedMedia-3.0/LibSharedMedia-3.0/LibSharedMedia-3.0.lua"
     local file = assert(io.open(path, "rb"))
@@ -117,6 +118,135 @@ test("low health sounds on threshold crossings and respects group settings", fun
     alerts.db.arena.health = false
     alerts:UNIT_HEALTH(nil, "arena1")
     equal(#state.sounds, 2, "disabled health alerts stay silent")
+end)
+
+test("healer-only party aura sounds require a healing specialization", function()
+    local state, alerts = setup()
+    alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+    local expectedSounds = 0
+    for _, spec in ipairs({
+        {65, true}, {105, true}, {256, true}, {257, true}, {264, true},
+        {66, false}, {70, false}, {102, false}, {103, false}, {258, false},
+        {262, false}, {263, false}, {250, false}, {62, false}, {false, false},
+    }) do
+        alerts:Reset("party1")
+        state.addon.buttons.party1 = {specID = spec[1] or nil}
+        alerts:UNIT_AURA(nil, "party1")
+        if spec[2] then expectedSounds = expectedSounds + 1 end
+        equal(#state.sounds, expectedSounds, "specialization " .. tostring(spec[1]))
+        equal(state.flashes.party1, color, "healer filtering preserves flashing")
+        equal(alerts:IsAlertActive("party1", "aura_number:49010"), 20, "visual alert remains active")
+        alerts:UNIT_AURA(nil, "party1")
+        equal(#state.sounds, expectedSounds, "repeated aura events do not replay sound")
+    end
+    equal(state.sounds[1], soundPath, "selected sound is used")
+    alerts.frame.party4 = {}
+    alerts:UNIT_AURA(nil, "party4")
+    equal(#state.sounds, expectedSounds, "a missing unit button cannot identify a healer")
+    state.addon.buttons.party1 = {specID = 256}
+    state.auras.HARMFUL = {}
+    alerts:UNIT_AURA(nil, "party1")
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+    alerts.db.party.aurasSpells[49010].flash = false
+    alerts:UNIT_AURA(nil, "party1")
+    equal(#state.sounds, expectedSounds + 1, "reapplied CC sounds again on a healer")
+    equal(state.flashes.party1, nil, "healer-only sound works with flashing disabled")
+end)
+
+test("healer-only aura sound is optional per rule and does not filter other alert kinds or arena", function()
+    local state, alerts = setup()
+    state.addon.buttons.party1 = {specID = 258}
+    alerts.db.party.healthSound = soundName
+    alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
+    alerts.db.party.aurasSpells[118] = {priority = 10, color = color, sound = soundName}
+    alerts.db.party.castsSpells[49010] = {priority = 30, color = color, sound = soundName}
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}, {name = "Polymorph", id = 118}}
+    alerts:UNIT_AURA(nil, "party1")
+    equal(#state.sounds, 1, "an unrestricted rule still sounds on a damage spec")
+    alerts:UNIT_HEALTH(nil, "party1")
+    alerts:UNIT_SPELLCAST_START(nil, "party1", 49010)
+    equal(#state.sounds, 3, "health and cast sounds still work on damage specs")
+    alerts.db.arena.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 4, "arena aura sounds are unaffected by a copied party setting")
+    alerts:GetOptions("party").auras.args["number:49010"].args.healerOnlySound.set({}, false)
+    alerts:Reset("party1")
+    alerts:UNIT_AURA(nil, "party1")
+    equal(#state.sounds, 6, "turning the filter off restores sounds for any party specialization")
+end)
+
+test("party settings expose healer-only sound through their player unit", function()
+    local state, alerts = setup()
+    SlashCmdList = {}
+    local file = assert(io.open("options.lua", "rb"))
+    local source = file:read("*a"):gsub("^\239\187\191", "")
+    file:close()
+    assert(loadstring(source, "@options.lua"))()
+    alerts.db.party.aurasSpells[49010] = {priority = 20, color = color}
+    alerts.db.arena.aurasSpells[49010] = {priority = 20, color = color}
+    for _, unit in ipairs({"player", "party1", "party", "arena1", "arena"}) do
+        local options = state.addon:SetupModuleOptions(unit, "Alerts", alerts, 1).args
+        local hidden = unit == "arena1" or unit == "arena"
+        equal(options.auras.args.newAura.args.healerOnlySound.hidden, hidden, unit .. " new aura visibility")
+        local control = options.auras.args["number:49010"].args.healerOnlySound
+        equal(control.hidden, hidden, unit .. " existing aura visibility")
+        if not hidden then
+            control.set({}, true)
+            equal(alerts.db.party.aurasSpells[49010].healerOnlySound, true, "real party page writes party settings")
+            control.set({}, false)
+        end
+        harness.validateOptions(options)
+    end
+end)
+
+test("party healer-only sound options persist through spell edits, reloads and profile copies", function()
+    local state, alerts = setup()
+    alerts.db.party.aurasSpells[118] = {priority = 20, color = color}
+    local options = alerts:GetOptions("party")
+    local existing = options.auras.args["number:118"].args.healerOnlySound
+    equal(existing.get(), false, "existing rules start unrestricted")
+    equal(existing.hidden, false, "party aura rules offer the option")
+    local args = options.auras.args.newAura.args
+    equal(args.healerOnlySound.get(), false, "new rules start unrestricted")
+    args.name.set({}, "Wyvern Sting")
+    args.spellID.set({}, "49010, 24131")
+    args.healerOnlySound.set({}, true)
+    local arenaOptions = alerts:GetOptions("arena")
+    equal(arenaOptions.auras.args.newAura.args.healerOnlySound.hidden, true, "arena hides the new rule control")
+    equal(arenaOptions.auras.args.newAura.args.healerOnlySound.get(), false, "pending choices are separate")
+    args.add.func()
+    local controls = options.auras.args["string:Wyvern Sting"].args
+    equal(controls.healerOnlySound.get(), true, "new name rule retains its choice")
+    controls.checkSpellID.set({}, true)
+    controls = options.auras.args["number:49010"].args
+    equal(controls.healerOnlySound.get(), true, "switching to exact IDs retains its choice")
+    controls.spellID.set({}, "24131, 49010")
+    state = harness.reload(state)
+    alerts = state.modules.Alerts
+    options = alerts:GetOptions("party")
+    controls = options.auras.args["number:24131"].args
+    equal(controls.healerOnlySound.get(), true, "choice survives ID reordering and reload")
+    harness.validateOptions(options)
+    alerts.db.arena.aurasSpells[49010] = {priority = 20, color = color}
+    equal(alerts:GetOptions("arena").auras.args["number:49010"].args.healerOnlySound.hidden, true,
+        "arena hides the existing rule control")
+    state.addon.dbi:SetProfile("Copy")
+    state.addon.dbi:CopyProfile("Default")
+    controls = alerts:GetOptions("party").auras.args["number:24131"].args
+    equal(controls.healerOnlySound.get(), true, "choice is copied with the profile")
+    controls.healerOnlySound.set({}, false)
+    equal(controls.healerOnlySound.get(), false, "copied profile can disable the filter")
+    state.addon.dbi:SetProfile("Default")
+    options = alerts:GetOptions("party")
+    controls = options.auras.args["number:24131"].args
+    equal(controls.healerOnlySound.get(), true, "original profile remains independent")
+    alerts.db.party.auras = false
+    assert(controls.healerOnlySound.disabled(), "disabled aura rules disable the control")
+    assert(options.auras.args.newAura.args.healerOnlySound.disabled(), "disabled auras disable the new rule control")
+    alerts.db.party.auras = true
+    alerts.IsUnitEnabled = function() return false end
+    assert(controls.healerOnlySound.disabled(), "disabled module disables the control")
 end)
 
 test("aura sounds follow exact spell rules without repeating on refresh", function()

@@ -10,6 +10,14 @@ local UnitBuff, UnitDebuff, UnitHealth, UnitHealthMax, UnitIsDeadOrGhost = UnitB
 local UnitAura = UnitAura
 local GetTime = GetTime
 
+local healerSpecs = {
+    [65] = true, -- Holy paladin
+    [105] = true, -- Restoration druid
+    [256] = true, -- Discipline priest
+    [257] = true, -- Holy priest
+    [264] = true, -- Restoration shaman
+}
+
 local function GetDefaultCastsSpells()
     local h = { priority = 10, color = { r = 0, g = 1, b = 0, a = 1 } }
     local cc = { priority = 20, color = { r = 1, g = 0, b = 0, a = 1 } }
@@ -323,7 +331,12 @@ function Alerts:UNIT_AURA(event, unit)
         if not active[key] then self:ClearAlert(unit, "aura_" .. key) end
     end
     for key, aura in pairs(active) do
-        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color, aura.sound, aura.flash)
+        local sound = aura.sound
+        if aura.healerOnlySound and GladiusEx:IsPartyUnit(unit) then
+            local button = GladiusEx.buttons[unit]
+            if not button or not healerSpecs[button.specID] then sound = nil end
+        end
+        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color, sound, aura.flash)
     end
     self.auraAlertKeys[unit] = active
 end
@@ -459,6 +472,7 @@ end
 function Alerts:GetOptions(unit)
     local newCastSound, newAuraSound = "None", "None"
     local newAuraFlash = true
+    local newAuraHealerOnlySound = false
     local options
     options = {
         general = {
@@ -698,6 +712,14 @@ function Alerts:GetOptions(unit)
                             set = function(info, value) newAuraFlash = value end,
                             disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
                         },
+                        healerOnlySound = {
+                            type = "toggle", name = L["Healer-only sound"], order = 4.5,
+                            desc = L["Only play this aura's sound for party members with a detected healing specialization. Unknown specializations stay silent."],
+                            hidden = unit ~= "party" and not GladiusEx:IsPartyUnit(unit),
+                            get = function() return newAuraHealerOnlySound end,
+                            set = function(info, value) newAuraHealerOnlySound = value end,
+                            disabled = function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end,
+                        },
                         add = {
                             type = "execute",
                             name = L["Add new aura"],
@@ -735,7 +757,8 @@ function Alerts:GetOptions(unit)
         function() return not self:IsUnitEnabled(unit) or not self.db[unit].casts end)
     GladiusEx:ConfigureNewSpellRule(self, unit, "aurasSpells", options.auras.args,
         options.auras.args.newAura.args,
-        function() return {priority = self.newAuraPriority, color = self.newAuraColor, sound = newAuraSound, flash = newAuraFlash} end,
+        function() return {priority = self.newAuraPriority, color = self.newAuraColor, sound = newAuraSound,
+            flash = newAuraFlash, healerOnlySound = newAuraHealerOnlySound} end,
         function(aura) return self:SetupAuraOptions(options, unit, aura) end,
         function() return not self:IsUnitEnabled(unit) or not self.db[unit].auras end)
 
@@ -798,6 +821,13 @@ function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
             desc = L["Flash the unit frame while this aura is active. Sound works independently."],
             get = function() return self.db[unit][field][spell].flash ~= false end,
             set = function(info, value) self:SetAuraFlash(unit, spell, value) end,
+        }
+        group.args.healerOnlySound = {
+            type = "toggle", name = L["Healer-only sound"], order = 4.5, disabled = disabled,
+            desc = L["Only play this aura's sound for party members with a detected healing specialization. Unknown specializations stay silent."],
+            hidden = unit ~= "party" and not GladiusEx:IsPartyUnit(unit),
+            get = function() return not not self.db[unit][field][spell].healerOnlySound end,
+            set = function(info, value) self.db[unit][field][spell].healerOnlySound = value end,
         }
     end
     return GladiusEx:ConfigureSpellRule(self, unit, field, options[kind].args, spell, group,

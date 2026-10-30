@@ -33,6 +33,8 @@ L["Alert sound"] = true
 L["Play a sound when this alert starts. Select None to disable sound."] = true
 L["Flash frame"] = true
 L["Flash the unit frame while this aura is active. Sound works independently."] = true
+L["Healer-only sound"] = true
+L["Only play this aura's sound for party members with a detected healing specialization. Unknown specializations stay silent."] = true
 
 -- Cooldowns module
 L["cat:pvp_trinket"] = "PvP Trinket"
