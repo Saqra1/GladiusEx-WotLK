@@ -18,6 +18,11 @@ local healerSpecs = {
     [264] = true, -- Restoration shaman
 }
 
+local function MigrateSoundOverride(settings, soundKey, overrideKey)
+    if settings[overrideKey] == false then settings[soundKey] = "None" end
+    settings[overrideKey] = nil
+end
+
 local function GetDefaultCastsSpells()
     local h = { priority = 10, color = { r = 0, g = 1, b = 0, a = 1 } }
     local cc = { priority = 20, color = { r = 1, g = 0, b = 0, a = 1 } }
@@ -52,6 +57,7 @@ local function GetDefaultAuraSpells()
 end
 
 local Alerts = GladiusEx:NewGladiusExModule("Alerts", {
+        sound = "None",
         disableWhenDead = false,
         minAlpha = 0.2,
         maxAlpha = 0.6,
@@ -79,8 +85,10 @@ function Alerts:OnInitialize()
     for _, namespace in ipairs({"Alerts", "party_Alerts"}) do
         local saved = namespaces[namespace]
         for _, profile in pairs(saved and saved.profiles or {}) do
+            MigrateSoundOverride(profile, "healthSound", "healthSoundOverride")
             for _, field in ipairs({"castsSpells", "aurasSpells"}) do
                 for spell, rule in pairs(profile[field] or {}) do
+                    if type(rule) == "table" then MigrateSoundOverride(rule, "sound", "soundOverride") end
                     if rule == false and type(self.defaults_arena[field][spell]) == "table" then
                         profile[field][spell] = {disabled = true}
                     end
@@ -238,6 +246,11 @@ function Alerts:UpdatePlayerState()
     end
 end
 
+function Alerts:GetAlertSound(unit, sound)
+    if not sound or sound == "" or sound == "None" then return self.db[unit].sound end
+    return sound
+end
+
 function Alerts:PlayAlertSound(sound)
     if not sound or sound == "None" then return end
     local path = LSM:Fetch("sound", sound, true)
@@ -352,7 +365,7 @@ function Alerts:UNIT_AURA(event, unit)
         if not active[key] then self:ClearAlert(unit, "aura_" .. key) end
     end
     for key, aura in pairs(active) do
-        local sound = aura.sound
+        local sound = self:GetAlertSound(unit, aura.sound)
         if aura.healerOnlySound and GladiusEx:IsPartyUnit(unit) then
             local button = GladiusEx.buttons[unit]
             if not button or not healerSpecs[button.specID] then sound = nil end
@@ -370,7 +383,8 @@ function Alerts:UNIT_HEALTH(event, unit)
     local healthMax = UnitHealthMax(unit)
 
     if not UnitIsDeadOrGhost(unit) and (health / healthMax) <= self.db[unit].healthThreshold then
-        self:SetAlert(unit, "health", self.db[unit].healthPriority, self.db[unit].healthColor, self.db[unit].healthSound)
+        local sound = self:GetAlertSound(unit, self.db[unit].healthSound)
+        self:SetAlert(unit, "health", self.db[unit].healthPriority, self.db[unit].healthColor, sound)
     else
         self:ClearAlert(unit, "health")
     end
@@ -390,7 +404,7 @@ function Alerts:ShowCastAlert(unit, name, id, succeeded)
     local cast, key = GladiusEx:GetSpellRule(self.db[unit], "castsSpells", name, id)
     if not cast then return end
     local alert = "cast_" .. GladiusEx:SpellRuleKey(key)
-    local sound = cast.sound
+    local sound = self:GetAlertSound(unit, cast.sound)
     self.castAlertKeys = self.castAlertKeys or {}
     if succeeded then
         self.castSuccesses = self.castSuccesses or {}
@@ -476,13 +490,22 @@ function Alerts:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, kind, sourceGUID, 
     end
 end
 
-function Alerts:GetSoundOption(get, set, disabled, order)
+function Alerts:GetSoundOption(get, set, disabled, order, unit, general)
     return {
         type = "select",
-        name = L["Alert sound"],
-        desc = L["Play a sound when this alert starts. Select None to disable sound."],
+        name = general and L["General alert sound"] or L["Alert sound"],
+        desc = general and L["Default sound for health, cast and aura alerts. Individual alerts can override this sound."]
+            or L["Leave blank or select None to use the general sound. Select a sound to override it."],
         dialogControl = "LSM30_Sound",
-        values = function() return LSM:HashTable("sound") end,
+        values = function()
+            local sounds = LSM:HashTable("sound")
+            if general then return sounds end
+            local choices = {}
+            for name, path in pairs(sounds) do choices[name] = path end
+            local inherited = LSM:Fetch("sound", self.db[unit].sound, true) or ""
+            choices[""], choices["None"] = inherited, inherited
+            return choices
+        end,
         get = get,
         set = set,
         disabled = disabled,
@@ -491,7 +514,7 @@ function Alerts:GetSoundOption(get, set, disabled, order)
 end
 
 function Alerts:GetOptions(unit)
-    local newCastSound, newAuraSound = "None", "None"
+    local newCastSound, newAuraSound = "", ""
     local newAuraFlash = true
     local newAuraHealerOnlySound = false
     local options
@@ -501,6 +524,10 @@ function Alerts:GetOptions(unit)
             name = L["General"],
             order = 1,
             args = {
+                sound = self:GetSoundOption(
+                    function() return self.db[unit].sound end,
+                    function(info, value) self.db[unit].sound = value end,
+                    function() return not self:IsUnitEnabled(unit) end, 0, unit, true),
                 disableWhenDead = {
                     type = "toggle",
                     name = L["Disable alerts while dead"],
@@ -641,7 +668,7 @@ function Alerts:GetOptions(unit)
                 healthSound = self:GetSoundOption(
                     function() return self.db[unit].healthSound end,
                     function(info, value) self.db[unit].healthSound = value end,
-                    function() return not self.db[unit].health or not self:IsUnitEnabled(unit) end, 50),
+                    function() return not self.db[unit].health or not self:IsUnitEnabled(unit) end, 50, unit),
             },
         },
         casts = {
@@ -687,7 +714,7 @@ function Alerts:GetOptions(unit)
                         sound = self:GetSoundOption(
                             function() return newCastSound end,
                             function(info, value) newCastSound = value end,
-                            function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end, 4),
+                            function() return not self.db[unit].casts or not self:IsUnitEnabled(unit) end, 4, unit),
                         add = {
                             type = "execute",
                             name = L["Add new cast"],
@@ -739,7 +766,7 @@ function Alerts:GetOptions(unit)
                         sound = self:GetSoundOption(
                             function() return newAuraSound end,
                             function(info, value) newAuraSound = value end,
-                            function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end, 4),
+                            function() return not self.db[unit].auras or not self:IsUnitEnabled(unit) end, 4, unit),
                         flash = {
                             type = "toggle", name = L["Flash frame"], order = 3.5,
                             desc = L["Flash the unit frame while this aura is active. Sound works independently."],
@@ -858,9 +885,9 @@ function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
                 end,
             },
             sound = self:GetSoundOption(
-                function() return self.db[unit][field][spell].sound or "None" end,
+                function() return self.db[unit][field][spell].sound or "" end,
                 function(info, value) self.db[unit][field][spell].sound = value end,
-                disabled, 4),
+                disabled, 4, unit),
             delete = {type = "execute", name = L["Delete"], order = 5, disabled = disabled},
         },
     }

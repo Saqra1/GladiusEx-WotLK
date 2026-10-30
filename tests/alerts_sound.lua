@@ -5,6 +5,7 @@ arg[2] = nil
 local equal = harness.equal
 local cases = 0
 local soundName, soundPath = "Test alert", [[Interface\AddOns\Test\alert.wav]]
+local overrideName, overridePath = "Test override", [[Interface\AddOns\Test\override.wav]]
 local color = {r = 1, g = 0, b = 0, a = 1}
 
 local function test(name, run)
@@ -32,6 +33,7 @@ local function setup()
     assert(loadstring(source, "@" .. path))()
     local media = LibStub("LibSharedMedia-3.0")
     media:Register("sound", soundName, soundPath)
+    media:Register("sound", overrideName, overridePath)
     media:Register("sound", "Empty", "")
     state.health, state.player, state.sounds, state.media = health, player, {}, media
     state.flashes, state.flashStarts = {}, 0
@@ -81,7 +83,7 @@ test("silent defaults and missing media do not play fallback sounds", function()
     for spell, rule in pairs(alerts.db.arena.castsSpells) do
         if rule then
             equal(options.casts.args[state.addon:SpellRuleKey(spell)].args.sound.get(),
-                "None", "legacy spell rules are silent")
+                "", "legacy spell rules have no sound override")
         end
     end
 end)
@@ -370,6 +372,97 @@ test("party healer-only sound options persist through spell edits, reloads and p
     assert(controls.healerOnlySound.disabled(), "disabled module disables the control")
 end)
 
+for _, group in ipairs({"arena", "party"}) do
+    test(group .. " general sound applies to existing alerts and stays within its group", function()
+        local state, alerts = setup()
+        local unit = group == "party" and "party1" or "arena1"
+        local other = group == "party" and "arena1" or "party1"
+        local options = alerts:GetOptions(group)
+        local general = options.general.args.sound
+        equal(general.get(), "None", "general sound starts silent")
+        equal(general.dialogControl, "LSM30_Sound", "general sound has the preview widget")
+        general.set({}, soundName)
+        for _, target in ipairs({unit, other, "player"}) do
+            -- Older user-created rules stored None even without a custom sound.
+            alerts.db[target].aurasSpells[49010] = {priority = 20, color = color, sound = "None"}
+        end
+        state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+        for _, target in ipairs({unit, other, "player"}) do
+            alerts:UNIT_HEALTH(nil, target)
+            alerts:UNIT_AURA(nil, target)
+            alerts:UNIT_SPELLCAST_START(nil, target, "Polymorph")
+        end
+        equal(#state.sounds, 3, "only the selected group's non-player alerts sound")
+        for _, path in ipairs(state.sounds) do equal(path, soundPath, "general sound used") end
+        equal(options.casts.args["string:Polymorph"].args.sound.get(), "",
+            "built-in spells inherit without selecting sounds individually")
+        equal(state.flashes.player, color, "muted player still has visual alerts")
+        harness.validateOptions(options)
+    end)
+end
+
+for _, kind in ipairs({"health", "casts", "auras"}) do
+    test(kind .. " uses the general sound when blank or None and a selected sound overrides it", function()
+        local state, alerts = setup()
+        alerts.db.party.sound = soundName
+        alerts.db.party.castsSpells[49010] = {priority = 10, color = color}
+        alerts.db.party.aurasSpells[49010] = {priority = 10, color = color}
+        state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+        local options = alerts:GetOptions("party")
+        local controls = kind == "health" and options.health.args or options[kind].args["number:49010"].args
+        local sound = controls[kind == "health" and "healthSound" or "sound"]
+        local function trigger()
+            alerts:Reset("party1")
+            if kind == "health" then alerts:UNIT_HEALTH(nil, "party1")
+            elseif kind == "casts" then alerts:UNIT_SPELLCAST_START(nil, "party1", 49010)
+            else alerts:UNIT_AURA(nil, "party1") end
+        end
+        equal(controls.soundOverride, nil, "no separate override checkbox")
+        equal(controls.healthSoundOverride, nil, "no separate health override checkbox")
+        equal(sound.disabled(), false, "sound picker is ready without enabling an override")
+        local silentPath = state.media:HashTable("sound")["None"]
+        equal(sound.values()[""], soundPath, "blank choice previews the general sound")
+        equal(sound.values()["None"], soundPath, "None choice previews the general sound")
+        equal(state.media:HashTable("sound")["None"], silentPath, "inherited previews do not change shared media")
+        equal(options.general.args.sound.values()["None"], silentPath, "general None remains silent")
+        trigger()
+        equal(state.sounds[1], soundPath, "inherits general sound")
+        sound.set({}, overrideName)
+        trigger()
+        equal(state.sounds[2], overridePath, "custom sound overrides general sound")
+        sound.set({}, "None")
+        trigger()
+        equal(state.sounds[3], soundPath, "None resumes the general sound")
+        equal(state.flashes.party1, kind == "health" and alerts.db.party.healthColor or color,
+            "inherited sound keeps visual alerts")
+        sound.set({}, "")
+        trigger()
+        equal(state.sounds[4], soundPath, "blank resumes the general sound")
+        options.general.args.sound.set({}, "None")
+        equal(sound.values()[""], silentPath, "blank preview follows a changed general sound")
+        trigger()
+        equal(#state.sounds, 4, "general None silences inherited alerts")
+        sound.set({}, overrideName)
+        trigger()
+        equal(state.sounds[5], overridePath, "custom sound works with a silent general sound")
+    end)
+end
+
+test("existing custom spell sounds remain overrides when a general sound is selected", function()
+    local state, alerts = setup()
+    alerts.db.party.sound = soundName
+    alerts.db.party.aurasSpells[49010] = {priority = 10, color = color, sound = overrideName}
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+    local controls = alerts:GetOptions("party").auras.args["number:49010"].args
+    equal(controls.sound.get(), overrideName, "existing custom choice is selected")
+    alerts:UNIT_AURA(nil, "party1")
+    equal(state.sounds[1], overridePath, "existing custom choice still plays")
+    controls.sound.set({}, "None")
+    alerts:Reset("party1")
+    alerts:UNIT_AURA(nil, "party1")
+    equal(state.sounds[2], soundPath, "existing custom choice can inherit instead")
+end)
+
 for _, unit in ipairs({"arena1", "player"}) do
     test(unit .. " aura alerts can be disabled and restored immediately without losing settings", function()
         local state, alerts = setup()
@@ -630,42 +723,46 @@ test("disabled groups stay silent while another group has Alerts enabled", funct
     equal(#state.sounds, 1, "only the enabled group sounds")
 end)
 
-for _, exact in ipairs({false, true}) do
-    test((exact and "exact" or "name") .. " cast sounds once across start, stop and success events", function()
+for _, mode in ipairs({"override", "general"}) do
+    for _, exact in ipairs({false, true}) do
+        test(mode .. " " .. (exact and "exact" or "name") .. " cast sounds once across start, stop and success events", function()
+            local state, alerts = setup()
+            if mode == "general" then alerts.db.arena.sound = soundName end
+            alerts.db.arena.castsSpells[exact and 49010 or "Wyvern Sting"] =
+                {priority = 10, color = color, sound = mode == "override" and soundName or nil}
+            alerts:UNIT_SPELLCAST_START(nil, "arena1", "Wyvern Sting", "Rank 6", 1, 49010)
+            alerts:UNIT_SPELLCAST_START(nil, "arena1", "Wyvern Sting", "Rank 6", 1, 49010)
+            alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_START", "enemy", "Enemy", 0,
+                nil, nil, 0, 49010, "Wyvern Sting")
+            equal(#state.sounds, 1, "duplicate starts sound once")
+            alerts:UNIT_SPELLCAST_STOP(nil, "arena1", "Wyvern Sting")
+            alerts:UNIT_SPELLCAST_SUCCEEDED(nil, "arena1", "Wyvern Sting", "Rank 6", 1, 49010)
+            alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
+                nil, nil, 0, 49010, "Wyvern Sting")
+            equal(#state.sounds, 1, "completion does not repeat the start sound")
+        end)
+    end
+
+    test(mode .. " instant casts and channel events sound once in either event order", function()
         local state, alerts = setup()
-        alerts.db.arena.castsSpells[exact and 49010 or "Wyvern Sting"] =
-            {priority = 10, color = color, sound = soundName}
-        alerts:UNIT_SPELLCAST_START(nil, "arena1", "Wyvern Sting", "Rank 6", 1, 49010)
-        alerts:UNIT_SPELLCAST_START(nil, "arena1", "Wyvern Sting", "Rank 6", 1, 49010)
-        alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_START", "enemy", "Enemy", 0,
-            nil, nil, 0, 49010, "Wyvern Sting")
-        equal(#state.sounds, 1, "duplicate starts sound once")
-        alerts:UNIT_SPELLCAST_STOP(nil, "arena1", "Wyvern Sting")
-        alerts:UNIT_SPELLCAST_SUCCEEDED(nil, "arena1", "Wyvern Sting", "Rank 6", 1, 49010)
+        if mode == "general" then alerts.db.arena.sound = soundName end
+        alerts.db.arena.castsSpells[49010] = {priority = 10, color = color, sound = mode == "override" and soundName or nil}
+        alerts:UNIT_SPELLCAST_SUCCEEDED(nil, "arena1", 49010)
         alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
             nil, nil, 0, 49010, "Wyvern Sting")
-        equal(#state.sounds, 1, "completion does not repeat the start sound")
+        equal(#state.sounds, 1, "instant cast sounds once")
+        alerts:ClearAllAlerts("arena1")
+        alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
+            nil, nil, 0, 49010, "Wyvern Sting")
+        alerts:UNIT_SPELLCAST_START("UNIT_SPELLCAST_CHANNEL_START", "arena1", "Wyvern Sting")
+        equal(#state.sounds, 2, "combat log before channel start sounds once")
+        alerts:ClearAllAlerts("arena1")
+        alerts:UNIT_SPELLCAST_START("UNIT_SPELLCAST_CHANNEL_START", "arena1", "Wyvern Sting")
+        alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
+            nil, nil, 0, 49010, "Wyvern Sting")
+        equal(#state.sounds, 3, "channel start before combat log sounds once")
     end)
 end
-
-test("instant casts and channel events sound once in either event order", function()
-    local state, alerts = setup()
-    alerts.db.arena.castsSpells[49010] = {priority = 10, color = color, sound = soundName}
-    alerts:UNIT_SPELLCAST_SUCCEEDED(nil, "arena1", 49010)
-    alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
-        nil, nil, 0, 49010, "Wyvern Sting")
-    equal(#state.sounds, 1, "instant cast sounds once")
-    alerts:ClearAllAlerts("arena1")
-    alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
-        nil, nil, 0, 49010, "Wyvern Sting")
-    alerts:UNIT_SPELLCAST_START("UNIT_SPELLCAST_CHANNEL_START", "arena1", "Wyvern Sting")
-    equal(#state.sounds, 2, "combat log before channel start sounds once")
-    alerts:ClearAllAlerts("arena1")
-    alerts:UNIT_SPELLCAST_START("UNIT_SPELLCAST_CHANNEL_START", "arena1", "Wyvern Sting")
-    alerts:COMBAT_LOG_EVENT_UNFILTERED(nil, 100, "SPELL_CAST_SUCCESS", "enemy", "Enemy", 0,
-        nil, nil, 0, 49010, "Wyvern Sting")
-    equal(#state.sounds, 3, "channel start before combat log sounds once")
-end)
 
 for _, unit in ipairs({"arena", "party"}) do
     test(unit .. " sound selections persist through ID changes, reloads and profile copies", function()
@@ -673,6 +770,7 @@ for _, unit in ipairs({"arena", "party"}) do
         local other = unit == "arena" and "party" or "arena"
         local options = alerts:GetOptions(unit)
         harness.validateOptions(options)
+        options.general.args.sound.set({}, overrideName)
         equal(options.health.args.healthSound.dialogControl, "LSM30_Sound", "preview widget used")
         equal(options.health.args.healthSound.values()[soundName], soundPath, "media sounds listed")
         options.health.args.healthSound.set({}, soundName)
@@ -700,6 +798,8 @@ for _, unit in ipairs({"arena", "party"}) do
         end
         state = harness.reload(state)
         alerts = state.modules.Alerts
+        equal(alerts.db[unit].sound, overrideName, "general sound survives reload")
+        equal(alerts.db[other].sound, "None", "other group remains silent")
         equal(alerts.db[unit].healthSound, soundName, "health selection survives reload")
         equal(alerts.db[unit].aurasSpells[49010].flash, false, "flashing choice survives reload")
         for _, field in ipairs({"castsSpells", "aurasSpells"}) do
@@ -708,6 +808,7 @@ for _, unit in ipairs({"arena", "party"}) do
         state.addon.dbi:SetProfile("Copy")
         state.addon.dbi:CopyProfile("Default")
         options = alerts:GetOptions(unit)
+        equal(options.general.args.sound.get(), overrideName, "general sound copied")
         equal(options.health.args.healthSound.get(), soundName, "health selection copied")
         equal(options.auras.args["number:49010"].args.flash.get(), false, "flashing choice copied")
         options.auras.args["number:49010"].args.flash.set({}, true)
@@ -722,8 +823,81 @@ for _, unit in ipairs({"arena", "party"}) do
         assert(options.auras.args["number:49010"].args.sound.disabled(), "disabled aura control")
         assert(options.auras.args["number:49010"].args.flash.disabled(), "disabled aura flashing control")
         state.addon.dbi:ResetProfile()
+        equal(alerts.db[unit].sound, "None", "profile reset restores general silence")
         equal(alerts.db[unit].healthSound, "None", "profile reset restores silence")
     end)
+
+    test(unit .. " new spells inherit and override choices survive reloads and spell-ID edits", function()
+        local state, alerts = setup()
+        local options = alerts:GetOptions(unit)
+        options.general.args.sound.set({}, soundName)
+        for _, kind in ipairs({"casts", "auras"}) do
+            local args = options[kind].args[kind == "casts" and "newCast" or "newAura"].args
+            equal(args.sound.get(), "", "new spells start blank and inherit by default")
+            equal(args.sound.disabled(), false, "new spells need no extra toggle")
+            args.name.set({}, "Wyvern Sting")
+            args.spellID.set({}, "49010, 24131")
+            args.checkSpellID.set({}, true)
+            args.add.func()
+            local controls = options[kind].args["number:49010"].args
+            controls.spellID.set({}, "24131, 49010")
+        end
+        state = harness.reload(state)
+        alerts = state.modules.Alerts
+        options = alerts:GetOptions(unit)
+        equal(options.general.args.sound.get(), soundName, "general choice survives reload")
+        for _, kind in ipairs({"casts", "auras"}) do
+            local rule = alerts.db[unit][kind .. "Spells"][24131]
+            equal(rule.sound, "", "blank survives reload and reordering IDs")
+            equal(alerts:GetAlertSound(unit, rule.sound), soundName,
+                "reloaded spell uses the general sound")
+            local controls = options[kind].args["number:24131"].args
+            controls.sound.set({}, "None")
+        end
+        state = harness.reload(state)
+        alerts = state.modules.Alerts
+        state.addon.dbi:SetProfile("Copy")
+        state.addon.dbi:CopyProfile("Default")
+        options = alerts:GetOptions(unit)
+        for _, kind in ipairs({"casts", "auras"}) do
+            local controls = options[kind].args["number:24131"].args
+            equal(controls.sound.get(), "None", "None survives reload and copy")
+            equal(alerts:GetAlertSound(unit, controls.sound.get()), soundName, "None still inherits after reload and copy")
+            controls.sound.set({}, overrideName)
+        end
+        state = harness.reload(state)
+        alerts = state.modules.Alerts
+        for _, kind in ipairs({"casts", "auras"}) do
+            local rule = alerts.db[unit][kind .. "Spells"][24131]
+            equal(rule.sound, overrideName, "selected sound survives reload")
+            equal(alerts:GetAlertSound(unit, rule.sound), overrideName, "selected sound still overrides after reload")
+            alerts:GetOptions(unit)[kind].args["number:24131"].args.sound.set({}, "")
+        end
+        state = harness.reload(state)
+        alerts = state.modules.Alerts
+        for _, kind in ipairs({"casts", "auras"}) do
+            local rule = alerts.db[unit][kind .. "Spells"][24131]
+            equal(rule.sound, "", "clearing a selected sound survives reload")
+            equal(alerts:GetAlertSound(unit, rule.sound), soundName, "cleared sound inherits after reload")
+        end
+    end)
 end
+
+test("old override checkboxes migrate to the single sound selection", function()
+    local state, alerts = setup()
+    alerts.db.party.sound = soundName
+    alerts.db.party.healthSound = overrideName
+    alerts.db.party.healthSoundOverride = false
+    alerts.db.party.castsSpells[49010] = {priority = 10, color = color, sound = overrideName, soundOverride = false}
+    alerts.db.party.aurasSpells[49010] = {priority = 10, color = color, sound = overrideName, soundOverride = true}
+    state = harness.reload(state)
+    alerts = state.modules.Alerts
+    equal(alerts.db.party.healthSound, "None", "unchecked health override uses the general sound")
+    equal(alerts.db.party.healthSoundOverride, nil, "old health checkbox removed")
+    equal(alerts.db.party.castsSpells[49010].sound, "None", "unchecked spell override uses the general sound")
+    equal(alerts.db.party.castsSpells[49010].soundOverride, nil, "old spell checkbox removed")
+    equal(alerts.db.party.aurasSpells[49010].sound, overrideName, "checked override retains its sound")
+    equal(alerts.db.party.aurasSpells[49010].soundOverride, nil, "checked spell checkbox removed")
+end)
 
 print("Passed " .. cases .. " alert sound tests")

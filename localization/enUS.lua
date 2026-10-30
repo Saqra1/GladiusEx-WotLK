@@ -29,12 +29,14 @@ L["Enter a spell name or a positive whole spell ID."] = true
 L["Names match all ranks and effects with that name. Numeric IDs match only that exact spell and override name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."] = true
 
 -- Alerts module
-L["Enable aura alert"] = true
-L["Enable sound and flashing for this aura. Turn off to keep its settings for later."] = true
 L["Disable alerts while dead"] = true
 L["Disable alert sounds and flashing while you are dead or a ghost."] = true
+L["Enable aura alert"] = true
+L["Enable sound and flashing for this aura. Turn off to keep its settings for later."] = true
+L["General alert sound"] = true
+L["Default sound for health, cast and aura alerts. Individual alerts can override this sound."] = true
 L["Alert sound"] = true
-L["Play a sound when this alert starts. Select None to disable sound."] = true
+L["Leave blank or select None to use the general sound. Select a sound to override it."] = true
 L["Flash frame"] = true
 L["Flash the unit frame while this aura is active. Sound works independently."] = true
 L["Healer-only sound"] = true
