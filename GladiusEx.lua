@@ -1366,16 +1366,20 @@ end
 function GladiusEx:UpdateUnitPosition(unit)
     local button = self.buttons[unit]
 
-    local left, right, top, bottom = self:GetWidgetsBounds(unit)
-
     button:ClearAllPoints()
 
     if self.db[unit].groupButtons then
+        -- Every slot uses the same geometry, including the hidden player slot.
+        -- Per-unit widget bounds must not move party1 past party2 on refresh.
+        local layout_unit = self:IsArenaUnit(unit) and "arena1" or "player"
+        if not self.buttons[layout_unit] then layout_unit = unit end
+        local layout_button = self.buttons[layout_unit]
+        local left, right, top, bottom = self:GetWidgetsBounds(layout_unit)
         local unit_index = self:GetUnitIndex(unit) - 1
         local num_frames = self.arena_size
         local anchor = self:GetUnitAnchor(unit)
-        local frame_width = button.frame_width
-        local frame_height = button.frame_height
+        local frame_width = layout_button.frame_width
+        local frame_height = layout_button.frame_height
         local real_width = frame_width + abs(left) + abs(right)
         local real_height = frame_height + abs(top) + abs(bottom)
         local margin_x = (real_width + self.db[unit].margin) * unit_index

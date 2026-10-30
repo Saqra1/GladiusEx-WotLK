@@ -3,7 +3,15 @@
 local function noop() end
 local combat, modifier, focused = false, nil, nil
 local all_frames = {}
+local units = {}
 InCombatLockdown = function() return combat end
+UnitExists = function(unit) return units[unit] and units[unit].exists end
+UnitIsDeadOrGhost = function(unit) return units[unit] and units[unit].dead end
+UnitHealth = function(unit) return units[unit] and units[unit].health or 0 end
+UnitGUID = function(unit) return units[unit] and units[unit].guid end
+GetNumPartyMembers = function() return 2 end
+GetNumArenaOpponents = function() return 0 end
+IsActiveBattlefieldArena = function() return true end
 IsShiftKeyDown = function() return modifier == "shift" end
 IsAltKeyDown = function() return modifier == "alt" end
 IsControlKeyDown = function() return modifier == "control" end
@@ -359,6 +367,63 @@ test("hiding the first row changes the reference without moving remaining frames
     addon:UpdateAnchorHandle("party")
     unchanged(before)
     local _, _, unit = addon:GetGroupPosition("party"); equal(unit, "party2")
+end)
+
+test("grouped unit slots do not move when an individual row's widget bounds change", function()
+    for _, grow in ipairs({"DOWN", "UP", "VCENTER", "LEFT", "RIGHT", "HCENTER"}) do
+        for _, scale in ipairs({0.64, 1.35}) do
+            setup(grow, scale, true, 5); update()
+            local before = snapshot()
+            for _, unit in ipairs({"party1", "party2", "arena2", "arena3"}) do
+                local button = addon.buttons[unit]
+                button.wleft, button.wright, button.wtop, button.wbottom = 550, 350, 260, 120
+                addon:UpdateUnitPosition(unit)
+            end
+            unchanged(before)
+        end
+    end
+end)
+
+test("party death, resurrection and queued roster refreshes keep party unit slots fixed", function()
+    local original = {}
+    for _, name in ipairs({"UpdateUnit", "RefreshUnit", "UpdateArenaFrames", "UpdateBackground", "SendMessage"}) do
+        original[name] = addon[name]
+    end
+    addon.UpdateUnit = function(self, unit) self:UpdateUnitPosition(unit) end
+    addon.RefreshUnit, addon.UpdateArenaFrames, addon.UpdateBackground, addon.SendMessage = noop, noop, noop, noop
+    for _, hidden_self in ipairs({false, true}) do
+        for _, grow in ipairs({"DOWN", "UP", "VCENTER", "LEFT", "RIGHT", "HCENTER"}) do
+            setup(grow, 0.64, hidden_self, 3, 0.64); update()
+            addon.db.base.hideSelf = hidden_self
+            units = {}
+            for _, unit in ipairs({"player", "party1", "party2"}) do
+                units[unit] = {exists = true, health = 100, guid = unit .. "-guid"}
+            end
+            addon:UpdatePartyFrames()
+            local before = snapshot()
+            for _, unit in ipairs({"player", "party1", "party2"}) do
+                combat = true
+                units[unit].dead, units[unit].health = true, 0
+                addon:UNIT_HEALTH("UNIT_HEALTH", unit)
+                assert(addon:ShouldDisplayUnitAsDead(unit))
+                addon:PARTY_MEMBERS_CHANGED()
+                unchanged(before)
+                assert(addon:IsUpdatePending())
+                combat = false
+                addon:PLAYER_REGEN_ENABLED()
+                unchanged(before)
+                assert(not addon:IsUpdatePending())
+                equal(addon.buttons[unit].soft_hidden, unit == "player" and hidden_self)
+                units[unit].dead, units[unit].health = nil, 100
+                addon:UNIT_HEALTH("UNIT_HEALTH", unit)
+                addon:PARTY_MEMBERS_CHANGED()
+                assert(not addon:ShouldDisplayUnitAsDead(unit))
+                unchanged(before)
+            end
+        end
+    end
+    for name in pairs(original) do addon[name] = original[name] end
+    addon.SendMessage = original.SendMessage
 end)
 
 test("a different profile keeps its saved placement instead of the previous profile's anchor", function()
