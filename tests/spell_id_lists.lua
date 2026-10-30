@@ -36,10 +36,71 @@ local function add(state, list, unit, name, ids, exact, priority)
     return module, groups
 end
 
+local function mockSpellTooltips()
+    local scans = {created = 0, links = {}}
+    local descriptions = {
+        [49010] = {"Wyvern Sting", "Sleeps the target.", "Deals damage when the target wakes."},
+        [24131] = {"Wyvern Sting", "Deals damage over time."},
+        [19386] = {"Wyvern Sting", "Sleeps the target."},
+    }
+    GetSpellLink = function(name)
+        if name == "Wyvern Sting" then return "spell:19386" end
+    end
+    local createFrame = CreateFrame
+    CreateFrame = function(kind, name, parent, template)
+        if kind ~= "GameTooltip" then return createFrame(kind, name, parent, template) end
+        scans.created = scans.created + 1
+        assert(template == "GameTooltipTemplate", "scanner uses the client tooltip template")
+        local tooltip = {}
+        function tooltip:SetOwner(_, anchor) equal(anchor, "ANCHOR_NONE", "scanner stays offscreen") end
+        function tooltip:ClearLines() self.lines = {} end
+        function tooltip:SetHyperlink(link)
+            scans.links[#scans.links + 1] = link
+            local id = assert(tonumber(link:match("spell:(%d+)")))
+            self.lines = descriptions[id] or {GetSpellInfo(id)}
+            for index, text in ipairs(self.lines) do
+                local value = text
+                _G[name .. "TextLeft" .. index] = {GetText = function() return value end}
+            end
+        end
+        function tooltip:NumLines() return #self.lines end
+        function tooltip:Hide() self.hidden = true end
+        scans.tooltip = tooltip
+        return tooltip
+    end
+    return scans
+end
+
 for _, unit in ipairs({"arena", "party"}) do
     local other = unit == "arena" and "party" or "arena"
     for _, list in ipairs(lists) do
         local label = unit .. " " .. list.module .. "/" .. list.section
+        test(label .. ": spell tooltips follow edits without changing matching or field help", function()
+            local state = setup(nil, true)
+            local scans = mockSpellTooltips()
+            local module, groups = add(state, list, unit, "Wyvern Sting", "49010, 24131", false)
+            local entry = groups[state.addon:SpellRuleKey("Wyvern Sting")]
+            equal(scans.created, 0, "building options does not scan every spell")
+            equal(entry.desc(), "Sleeps the target.\nDeals damage when the target wakes.", "all description lines retained")
+            equal(scans.links[#scans.links], "spell:49010", "listed ID takes precedence over name lookup")
+            assert(scans.tooltip.hidden, "scanner is hidden after reading")
+            assert(entry.args.name.desc():find("Name of the spell\n\nSleeps the target.", 1, true), "name help retained")
+            assert(entry.args.spellID.desc():find("Leave Check Spell IDs off", 1, true), "ID matching help retained")
+            equal(entry.args.checkSpellID.get({}), false, "tooltip does not enable ID matching")
+            entry.args.spellID.set({}, "24131")
+            entry = groups[state.addon:SpellRuleKey("Wyvern Sting")]
+            equal(entry.desc(), "Deals damage over time.", "edited ID refreshes description without stale lines")
+            equal(scans.created, 1, "hover reuses one scanner")
+            equal(state.addon:GetSpellRule(module.db[unit], list.field, "Wyvern Sting", 990001),
+                module.db[unit][list.field]["Wyvern Sting"], "name matching preserved")
+
+            local pending = groups[list.new].args
+            pending.name.set({}, "Wyvern Sting")
+            assert(pending.name.desc():find("Sleeps the target.", 1, true), "new spell preview resolves a known name")
+            pending.spellID.set({}, "24131")
+            assert(pending.spellID.desc():find("Deals damage over time.", 1, true), "new spell preview follows its ID")
+        end)
+
         test(label .. ": lists keep optional matching, settings, copies and resets", function()
             local state = setup(nil, true)
             local module, groups = add(state, list, unit, "Wyvern Sting", " 49010,24131, 49010 ", false)
@@ -163,6 +224,24 @@ for _, unit in ipairs({"arena", "party"}) do
         equal(controls(state, groups, 118).spellID.get({}), "118, 12824, 12825, 12826, 28271, 28272", "reset restores one default group")
     end)
 end
+
+test("unknown spell tooltips retain fallback text and never reuse another spell's description", function()
+    local state = setup(nil, true)
+    local scans = mockSpellTooltips()
+    local _, groups = add(state, lists[1], "arena", "Wyvern Sting", "49010", true)
+    equal(groups[state.addon:SpellRuleKey(49010)].desc(),
+        "Sleeps the target.\nDeals damage when the target wakes.", "scanner starts with known content")
+    local _, unknown = add(state, lists[1], "arena", "Custom aura", "999999", true)
+    local entry = unknown[state.addon:SpellRuleKey(999999)]
+    equal(entry.desc(), "Custom aura", "unknown ID falls back to saved name")
+    equal(#scans.links, 1, "unknown ID is never sent to the tooltip")
+    equal(entry.args.name.desc(), "Name of the spell", "unknown name keeps input help")
+
+    local _, empty = add(state, lists[1], "arena", "Spell 123456", "123456", true)
+    equal(empty[state.addon:SpellRuleKey(123456)].desc(), "Spell 123456", "spell without description falls back to name")
+    local _, named = add(state, lists[1], "arena", "Custom aura", "", false)
+    equal(named[state.addon:SpellRuleKey("Custom aura")].desc(), "Custom aura", "unresolved name stays editable")
+end)
 
 test("legacy customized and deleted ranks survive grouping in inactive profiles too", function()
     local saved = {namespaces = {}}

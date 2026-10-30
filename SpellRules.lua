@@ -172,6 +172,43 @@ function GladiusEx:WriteSpellRule(module, unit, field, groups, name, ids, exact,
     write(ids, name, value, exact)
 end
 
+local spellTooltip
+local function spellDescription(name, ids)
+    local link
+    for _, id in ipairs(ids) do
+        if GetSpellInfo(id) then
+            link = "spell:" .. id
+            break
+        end
+    end
+    if #ids == 0 and name and name ~= "" then link = GetSpellLink(name) end
+    if not link then return end
+
+    -- Scan a separate tooltip so AceConfig can keep displaying its own tooltip.
+    if not spellTooltip then
+        spellTooltip = CreateFrame("GameTooltip", "GladiusExSpellRuleTooltip", UIParent, "GameTooltipTemplate")
+    end
+    spellTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+    spellTooltip:ClearLines()
+    spellTooltip:SetHyperlink(link)
+    local lines = {}
+    for index = 2, spellTooltip:NumLines() do
+        local line = _G["GladiusExSpellRuleTooltipTextLeft" .. index]
+        local text = line and line:GetText()
+        if text and text ~= "" then lines[#lines + 1] = text end
+    end
+    spellTooltip:Hide()
+    if #lines > 0 then return table.concat(lines, "\n") end
+end
+
+local function spellDescriptionOption(getName, getIDs, help)
+    return function()
+        local description = spellDescription(getName(), getIDs())
+        if description then return help and help .. "\n\n" .. description or description end
+        return help or getName()
+    end
+end
+
 local function idOptions(getName, getIDs, setIDs, getCheck, setCheck, disabled)
     local function validate(value)
         local ids = GladiusEx:ParseSpellIDs(value)
@@ -185,7 +222,8 @@ local function idOptions(getName, getIDs, setIDs, getCheck, setCheck, disabled)
     return {
         spellID = {
             type = "input", name = L["Spell IDs"], order = 1.1, width = "full",
-            desc = L["Optional. Separate IDs with commas. Leave Check Spell IDs off to match by name."],
+            desc = spellDescriptionOption(getName, getIDs,
+                L["Optional. Separate IDs with commas. Leave Check Spell IDs off to match by name."]),
             get = function() return table.concat(getIDs(), ", ") end,
             validate = function(info, value) return validate(value) end,
             set = function(info, value)
@@ -212,7 +250,9 @@ function GladiusEx:ConfigureNewSpellRule(module, unit, field, groups, args, buil
     pending[field] = pending[field] or {}
     local state = pending[field]
     args.name = {
-        type = "input", name = L["Spell name"], desc = L["Name of the spell"], order = 1,
+        type = "input", name = L["Spell name"], order = 1,
+        desc = spellDescriptionOption(function() return state.name end,
+            function() return state.spellIDs or {} end, L["Name of the spell"]),
         get = function() return state.name or "" end,
         validate = function(info, value)
             return self:ParseSpellName(value) ~= nil or L["Enter a spell name."]
@@ -261,9 +301,11 @@ function GladiusEx:ConfigureSpellRule(module, unit, field, groups, spell, group,
     if type(spell) == "number" then
         label = #ids() > 1 and L["%s (%d IDs)"]:format(label, #ids()) or label .. " (" .. spell .. ")"
     end
-    group.name, group.desc = label, label
+    group.name = label
+    group.desc = spellDescriptionOption(name, ids)
     group.args.name = {
-        type = "input", name = L["Spell name"], desc = L["Name of the spell"], order = 1,
+        type = "input", name = L["Spell name"], order = 1,
+        desc = spellDescriptionOption(name, ids, L["Name of the spell"]),
         get = name,
         validate = function(info, value)
             return self:ParseSpellName(value) ~= nil or L["Enter a spell name."]
