@@ -15,9 +15,13 @@ end
 
 local function setup()
     local health = {value = 20, maximum = 100, dead = false}
+    local player = {dead = false, ghost = false}
     UnitHealth = function() return health.value end
     UnitHealthMax = function() return health.maximum end
-    UnitIsDeadOrGhost = function() return health.dead end
+    UnitIsDeadOrGhost = function(unit)
+        if unit == "player" then return player.dead or player.ghost end
+        return health.dead
+    end
     local state = harness.setup(nil, true)
     state.addon.buttons = {}
     GetLocale = function() return "enUS" end
@@ -29,14 +33,14 @@ local function setup()
     local media = LibStub("LibSharedMedia-3.0")
     media:Register("sound", soundName, soundPath)
     media:Register("sound", "Empty", "")
-    state.health, state.sounds, state.media = health, {}, media
+    state.health, state.player, state.sounds, state.media = health, player, {}, media
     state.flashes, state.flashStarts = {}, 0
     PlaySoundFile = function(...)
         equal(select("#", ...), 1, "3.3.5a playback uses only the file path")
         state.sounds[#state.sounds + 1] = (...)
     end
     local alerts = state.modules.Alerts
-    alerts.frame = {arena1 = {}, arena2 = {}, party1 = {}}
+    alerts.frame = {arena1 = {}, arena2 = {}, party1 = {}, party2 = {}}
     alerts.StartFlash = function(_, unit, flashColor)
         state.flashes[unit] = flashColor
         state.flashStarts = state.flashStarts + 1
@@ -98,6 +102,102 @@ test("each newly active alert sounds once, including lower-priority alerts", fun
     alerts:SetAlert("arena1", "high", 20, color, soundName)
     equal(#state.sounds, 5, "reset permits a new alert")
 end)
+
+for _, group in ipairs({"arena", "party"}) do
+    test(group .. " death suppression stops flashes and silences health, aura and cast alerts until resurrection", function()
+        local state, alerts = setup()
+        local target = group .. "1"
+        local companion = group .. "2"
+        local other = group == "arena" and "party1" or "arena1"
+        local events = {}
+        alerts.RegisterEvent = function(_, event, handler) events[event] = handler end
+        alerts:OnEnable()
+        local function fire(event)
+            assert(events[event], event .. " is registered")
+            alerts[events[event]](alerts, event)
+        end
+        alerts:GetOptions(group).general.args.disableWhenDead.set({}, true)
+        alerts.db[group].healthSound = soundName
+        alerts.db[group].aurasSpells[49010] = {priority = 20, color = color, sound = soundName}
+        alerts.db[group].castsSpells[49010] = {priority = 30, color = color, sound = soundName}
+        state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+        local function trigger(unit)
+            alerts:UNIT_HEALTH(nil, unit)
+            alerts:UNIT_AURA(nil, unit)
+            alerts:UNIT_SPELLCAST_START(nil, unit, 49010)
+        end
+        trigger(target)
+        alerts:SetAlert(other, "other", 10, color, soundName)
+        equal(#state.sounds, 4, "all alert kinds work while alive")
+        state.player.dead = true
+        fire("PLAYER_DEAD")
+        equal(state.flashes[target], nil, "death immediately stops an active flash")
+        equal(state.flashes[other], color, "other group's flashes remain active")
+        trigger(companion)
+        alerts:UNIT_SPELLCAST_STOP(nil, target, 49010)
+        equal(state.flashes[target], nil, "priority fallback stays hidden while dead")
+        equal(state.flashes[companion], nil, "new alerts stay hidden while dead")
+        equal(#state.sounds, 4, "new health, aura and cast alerts stay silent while dead")
+        state.player.dead, state.player.ghost = false, true
+        fire("PLAYER_ALIVE")
+        equal(state.flashes[target], nil, "releasing spirit keeps alerts suppressed")
+        alerts:SetAlert(target, "ghost", 5, color, soundName)
+        equal(#state.sounds, 4, "ghost alerts stay silent")
+        state.player.ghost = false
+        fire("PLAYER_UNGHOST")
+        equal(state.flashes[target], color, "resurrection restores the active aura flash")
+        equal(state.flashes[companion], color, "alerts tracked while dead resume flashing")
+        equal(#state.sounds, 4, "resurrection does not replay sounds from while dead")
+        alerts:Reset(companion)
+        trigger(companion)
+        equal(#state.sounds, 7, "new alerts sound normally after resurrection")
+        state.player.dead = true
+        fire("PLAYER_DEAD")
+        state.player.dead = false
+        fire("PLAYER_ALIVE")
+        equal(state.flashes[companion], color, "resurrection without releasing restores flashes")
+    end)
+
+    test(group .. " death suppression is optional and toggles immediately in Alerts General", function()
+        local state, alerts = setup()
+        local target, other = group .. "1", group == "arena" and "party" or "arena"
+        local options = alerts:GetOptions(group)
+        harness.validateOptions(options)
+        local control = options.general.args.disableWhenDead
+        equal(control.type, "toggle", "General exposes the toggle")
+        equal(control.get(), false, "suppression is off by default")
+        state.player.dead = true
+        alerts:SetAlert(target, "active", 10, color, soundName)
+        equal(#state.sounds, 1, "default preserves alerts while dead")
+        equal(state.flashes[target], color, "default preserves flashing while dead")
+        control.set({}, true)
+        equal(control.get(), true, "toggle saves its value")
+        equal(alerts.db[other].disableWhenDead, false, "other group retains its choice")
+        equal(state.flashes[target], nil, "enabling while dead immediately stops flashing")
+        control.set({}, false)
+        equal(state.flashes[target], color, "disabling while dead immediately restores flashing")
+        equal(#state.sounds, 1, "toggling does not repeat an existing sound")
+        alerts:SetAlert(target, "new", 20, color, soundName)
+        equal(#state.sounds, 2, "disabling restores new sounds while dead")
+        alerts.IsUnitEnabled = function() return false end
+        equal(control.disabled(), true, "disabled module disables the control")
+    end)
+
+    test(group .. " death suppression persists through reloads and profile copies", function()
+        local state, alerts = setup()
+        local other = group == "arena" and "party" or "arena"
+        alerts:GetOptions(group).general.args.disableWhenDead.set({}, true)
+        state = harness.reload(state)
+        alerts = state.modules.Alerts
+        equal(alerts:GetOptions(group).general.args.disableWhenDead.get(), true, "choice survives reload")
+        equal(alerts.db[other].disableWhenDead, false, "other group remains independent")
+        state.addon.dbi:SetProfile("Copy")
+        state.addon.dbi:CopyProfile("Default")
+        equal(alerts.db[group].disableWhenDead, true, "choice is copied with the profile")
+        state.addon.dbi:ResetProfile()
+        equal(alerts.db[group].disableWhenDead, false, "profile reset restores the default")
+    end)
+end
 
 test("low health sounds on threshold crossings and respects group settings", function()
     local state, alerts = setup()

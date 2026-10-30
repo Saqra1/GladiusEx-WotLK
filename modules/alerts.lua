@@ -52,6 +52,7 @@ local function GetDefaultAuraSpells()
 end
 
 local Alerts = GladiusEx:NewGladiusExModule("Alerts", {
+        disableWhenDead = false,
         minAlpha = 0.2,
         maxAlpha = 0.6,
         duration = 0.35,
@@ -91,6 +92,9 @@ function Alerts:OnInitialize()
 end
 
 function Alerts:OnEnable()
+    self:RegisterEvent("PLAYER_DEAD", "UpdatePlayerState")
+    self:RegisterEvent("PLAYER_ALIVE", "UpdatePlayerState")
+    self:RegisterEvent("PLAYER_UNGHOST", "UpdatePlayerState")
     self:RegisterEvent("UNIT_AURA")
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self:RegisterEvent("UNIT_HEALTH")
@@ -224,6 +228,16 @@ end
 
 local alerts = {}
 local alerts_color = {}
+function Alerts:IsSuppressed(unit)
+    return self.db[unit].disableWhenDead and UnitIsDeadOrGhost("player")
+end
+
+function Alerts:UpdatePlayerState()
+    for unit in pairs(self.frame or {}) do
+        if self.db[unit].disableWhenDead then self:UpdateAlertColor(unit) end
+    end
+end
+
 function Alerts:PlayAlertSound(sound)
     if not sound or sound == "None" then return end
     local path = LSM:Fetch("sound", sound, true)
@@ -244,12 +258,13 @@ function Alerts:SetAlert(unit, alert, priority, color, sound, flash)
         alerts_color[unit][alert] = color
         alerts[unit].count = alerts[unit].count + 1
 
-        if flash ~= false and (not alerts[unit].current or alerts[unit].priority < priority) then
+        local suppressed = self:IsSuppressed(unit)
+        if not suppressed and flash ~= false and (not alerts[unit].current or alerts[unit].priority < priority) then
             alerts[unit].priority = priority
             alerts[unit].current = alert
             self:StartFlash(unit, color)
         end
-        if self:IsUnitEnabled(unit) then self:PlayAlertSound(sound) end
+        if not suppressed and self:IsUnitEnabled(unit) then self:PlayAlertSound(sound) end
     elseif alerts[unit].flash[alert] ~= (flash ~= false) then
         alerts[unit].flash[alert] = flash ~= false
         self:UpdateAlertColor(unit)
@@ -258,6 +273,12 @@ end
 
 function Alerts:UpdateAlertColor(unit)
     if not alerts[unit] then return end
+    if self:IsSuppressed(unit) then
+        alerts[unit].priority = 0
+        alerts[unit].current = false
+        self:StopFlash(unit)
+        return
+    end
     -- find new alert
     local new_alert
     local new_priority = 0
@@ -480,6 +501,20 @@ function Alerts:GetOptions(unit)
             name = L["General"],
             order = 1,
             args = {
+                disableWhenDead = {
+                    type = "toggle",
+                    name = L["Disable alerts while dead"],
+                    desc = L["Disable alert sounds and flashing while you are dead or a ghost."],
+                    get = function() return self.db[unit].disableWhenDead end,
+                    set = function(info, value)
+                        self.db[unit].disableWhenDead = value
+                        for target in pairs(self.frame or {}) do
+                            if self.db[target] == self.db[unit] then self:UpdateAlertColor(target) end
+                        end
+                    end,
+                    disabled = function() return not self:IsUnitEnabled(unit) end,
+                    order = 0.5,
+                },
                 bar = {
                     type = "group",
                     name = L["Alert animation"],
