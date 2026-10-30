@@ -264,7 +264,7 @@ function Alerts:SetAlert(unit, alert, priority, color, sound, flash)
             alerts[unit].current = alert
             self:StartFlash(unit, color)
         end
-        if not suppressed and self:IsUnitEnabled(unit) then self:PlayAlertSound(sound) end
+        if not suppressed and unit ~= "player" and self:IsUnitEnabled(unit) then self:PlayAlertSound(sound) end
     elseif alerts[unit].flash[alert] ~= (flash ~= false) then
         alerts[unit].flash[alert] = flash ~= false
         self:UpdateAlertColor(unit)

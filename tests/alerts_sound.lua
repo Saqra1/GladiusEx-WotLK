@@ -40,7 +40,7 @@ local function setup()
         state.sounds[#state.sounds + 1] = (...)
     end
     local alerts = state.modules.Alerts
-    alerts.frame = {arena1 = {}, arena2 = {}, party1 = {}, party2 = {}}
+    alerts.frame = {arena1 = {}, arena2 = {}, player = {}, party1 = {}, party2 = {}, party3 = {}, party4 = {}}
     alerts.StartFlash = function(_, unit, flashColor)
         state.flashes[unit] = flashColor
         state.flashStarts = state.flashStarts + 1
@@ -218,6 +218,24 @@ test("low health sounds on threshold crossings and respects group settings", fun
     alerts.db.arena.health = false
     alerts:UNIT_HEALTH(nil, "arena1")
     equal(#state.sounds, 2, "disabled health alerts stay silent")
+end)
+
+test("party health, aura and cast sounds exclude the player while keeping visual alerts", function()
+    local state, alerts = setup()
+    alerts.db.party.healthSound = soundName
+    alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName}
+    alerts.db.party.castsSpells[49010] = {priority = 30, color = color, sound = soundName}
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+    for index, unit in ipairs({"player", "party1", "party2", "party3", "party4"}) do
+        alerts:UNIT_HEALTH(nil, unit)
+        alerts:UNIT_AURA(nil, unit)
+        alerts:UNIT_SPELLCAST_START(nil, unit, "Wyvern Sting", "Rank 6", 1, 49010)
+        equal(#state.sounds, (index - 1) * 3, unit .. " only party members sound")
+        equal(alerts:IsAlertActive(unit, "health"), 10, unit .. " health alert remains active")
+        equal(alerts:IsAlertActive(unit, "aura_number:49010"), 20, unit .. " aura alert remains active")
+        equal(alerts:IsAlertActive(unit, "cast_number:49010"), 30, unit .. " cast alert remains active")
+        equal(state.flashes[unit], color, unit .. " visual alerts still flash")
+    end
 end)
 
 test("healer-only party aura sounds require a healing specialization", function()
