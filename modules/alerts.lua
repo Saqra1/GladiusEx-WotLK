@@ -344,7 +344,7 @@ function Alerts:UNIT_AURA(event, unit)
             local name, _, _, _, _, _, _, _, _, _, id = UnitAura(unit, index, filter)
             if not name then break end
             local aura, key = GladiusEx:GetSpellRule(self.db[unit], "aurasSpells", name, id)
-            if aura then active[GladiusEx:SpellRuleKey(key)] = aura end
+            if aura and aura.enabled ~= false then active[GladiusEx:SpellRuleKey(key)] = aura end
         end
     end
     self.auraAlertKeys = self.auraAlertKeys or {}
@@ -808,6 +808,20 @@ function Alerts:SetupAuraOptions(options, unit, spell)
     return self:SetupSpellOptions(options, unit, spell, "aurasSpells", "auras")
 end
 
+function Alerts:SetAuraEnabled(unit, spell, value)
+    self.db[unit].aurasSpells[spell].enabled = value
+    local alert = "aura_" .. GladiusEx:SpellRuleKey(spell)
+    for target in pairs(self.frame or {}) do
+        if self.db[target] == self.db[unit] then
+            if not value then
+                self:ClearAlert(target, alert)
+            elseif self:IsUnitEnabled(target) then
+                self:UNIT_AURA(nil, target)
+            end
+        end
+    end
+end
+
 function Alerts:SetAuraFlash(unit, spell, value)
     local rule = self.db[unit].aurasSpells[spell]
     rule.flash = value
@@ -851,6 +865,12 @@ function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
         },
     }
     if kind == "auras" then
+        group.args.enabled = {
+            type = "toggle", name = L["Enable aura alert"], order = 0, disabled = disabled,
+            desc = L["Enable sound and flashing for this aura. Turn off to keep its settings for later."],
+            get = function() return self.db[unit][field][spell].enabled ~= false end,
+            set = function(info, value) self:SetAuraEnabled(unit, spell, value) end,
+        }
         group.args.flash = {
             type = "toggle", name = L["Flash frame"], order = 3.5, disabled = disabled,
             desc = L["Flash the unit frame while this aura is active. Sound works independently."],

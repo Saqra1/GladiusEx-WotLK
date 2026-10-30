@@ -309,6 +309,9 @@ test("party settings expose healer-only sound through their player unit", functi
         equal(options.auras.args.newAura.args.healerOnlySound.hidden, hidden, unit .. " new aura visibility")
         local control = options.auras.args["number:49010"].args.healerOnlySound
         equal(control.hidden, hidden, unit .. " existing aura visibility")
+        local enabled = options.auras.args["number:49010"].args.enabled
+        equal(enabled.type, "toggle", unit .. " exposes the aura enable control")
+        equal(enabled.get(), true, unit .. " existing auras start enabled")
         if not hidden then
             control.set({}, true)
             equal(alerts.db.party.aurasSpells[49010].healerOnlySound, true, "real party page writes party settings")
@@ -365,6 +368,119 @@ test("party healer-only sound options persist through spell edits, reloads and p
     alerts.db.party.auras = true
     alerts.IsUnitEnabled = function() return false end
     assert(controls.healerOnlySound.disabled(), "disabled module disables the control")
+end)
+
+for _, unit in ipairs({"arena1", "player"}) do
+    test(unit .. " aura alerts can be disabled and restored immediately without losing settings", function()
+        local state, alerts = setup()
+        local target = unit == "player" and "party1" or "arena1"
+        local companion = unit == "player" and "party2" or "arena2"
+        local other = unit == "player" and "arena1" or "party1"
+        alerts.frame = {[target] = {}, [companion] = {}, [other] = {}}
+        local rule = {priority = 50, color = color, sound = soundName}
+        alerts.db[unit].aurasSpells[49010] = rule
+        alerts.db[other].aurasSpells[49010] = {priority = 50, color = color, sound = soundName}
+        state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+        alerts:UNIT_HEALTH(nil, target)
+        for frame in pairs(alerts.frame) do alerts:UNIT_AURA(nil, frame) end
+        equal(#state.sounds, 3, "enabled aura alerts sound normally")
+        local controls = alerts:GetOptions(unit).auras.args["number:49010"].args
+        equal(controls.enabled.get(), true, "existing aura starts enabled")
+        controls.enabled.set({}, false)
+        equal(controls.enabled.get(), false, "aura can be turned off")
+        equal(alerts.db[unit].aurasSpells[49010], rule, "the original rule is retained")
+        equal(rule.priority, 50, "priority is retained")
+        equal(rule.color, color, "color is retained")
+        equal(rule.sound, soundName, "sound is retained")
+        equal(state.flashes[target], alerts.db[unit].healthColor, "another active alert resumes flashing")
+        equal(state.flashes[companion], nil, "other frames stop the disabled aura flash immediately")
+        equal(state.flashes[other], color, "the other group's aura remains active")
+        alerts:UNIT_AURA(nil, target)
+        alerts:UNIT_AURA(nil, companion)
+        equal(#state.sounds, 3, "disabled auras stay silent")
+        assert(not alerts:IsAlertActive(target, "aura_number:49010"), "disabled aura is inactive")
+        equal(alerts:GetOptions(unit).auras.args["number:49010"].args.enabled.get(), false,
+            "the disabled aura stays listed when options rebuild")
+        controls.enabled.set({}, true)
+        equal(state.flashes[target], color, "reenabling restores the active aura flash")
+        equal(state.flashes[companion], color, "reenabling refreshes all matching frames")
+        equal(#state.sounds, 5, "reenabling an active aura sounds once per matching frame")
+        controls.enabled.set({}, true)
+        equal(#state.sounds, 5, "repeated enabling does not repeat the active alert")
+        alerts.db[unit].auras = false
+        assert(controls.enabled.disabled(), "the group aura switch disables the control")
+    end)
+
+    test(unit .. " disabled aura choices survive spell edits, reloads and profile copies", function()
+        local state, alerts = setup()
+        local options = alerts:GetOptions(unit)
+        local input = options.auras.args.newAura.args
+        input.name.set({}, "Wyvern Sting")
+        input.spellID.set({}, "49010, 24131")
+        input.priority.set({}, 42)
+        input.sound.set({}, soundName)
+        input.flash.set({}, false)
+        input.healerOnlySound.set({}, true)
+        input.add.func()
+        local controls = options.auras.args["string:Wyvern Sting"].args
+        equal(controls.enabled.get(), true, "new auras start enabled")
+        controls.enabled.set({}, false)
+        controls.checkSpellID.set({}, true)
+        controls = options.auras.args["number:49010"].args
+        equal(controls.enabled.get(), false, "switching to exact IDs preserves the choice")
+        controls.spellID.set({}, "24131, 49010")
+        state = harness.reload(state)
+        alerts = state.modules.Alerts
+        options = alerts:GetOptions(unit)
+        harness.validateOptions(options)
+        controls = options.auras.args["number:24131"].args
+        equal(controls.enabled.get(), false, "the disabled aura stays listed after reordering IDs and reloading")
+        equal(controls.priority.get(), 42, "saved priority is retained")
+        equal(controls.sound.get(), soundName, "saved sound is retained")
+        equal(controls.flash.get(), false, "saved flashing choice is retained")
+        equal(controls.healerOnlySound.get(), true, "saved healer filter is retained")
+        state.addon.dbi:SetProfile("Copy")
+        state.addon.dbi:CopyProfile("Default")
+        controls = alerts:GetOptions(unit).auras.args["number:24131"].args
+        equal(controls.enabled.get(), false, "copied profiles retain disabled auras")
+        controls.enabled.set({}, true)
+        equal(controls.enabled.get(), true, "copied profiles can reenable the aura")
+        state.addon.dbi:SetProfile("Default")
+        controls = alerts:GetOptions(unit).auras.args["number:24131"].args
+        equal(controls.enabled.get(), false, "reenabling the copy leaves the original disabled")
+        controls.delete.func()
+        state = harness.reload(state)
+        equal(state.modules.Alerts:GetOptions(unit).auras.args["number:24131"], nil,
+            "deletion still removes the saved aura")
+    end)
+end
+
+test("a disabled exact aura rule suppresses its IDs without falling back to a name rule", function()
+    local state, alerts = setup()
+    alerts.frame = {arena1 = {}}
+    alerts.db.arena.aurasSpells["Wyvern Sting"] = {priority = 10, color = color, sound = soundName}
+    local options = alerts:GetOptions("arena1")
+    local input = options.auras.args.newAura.args
+    input.name.set({}, "Wyvern Sting")
+    input.spellID.set({}, "49010, 24131")
+    input.checkSpellID.set({}, true)
+    input.sound.set({}, soundName)
+    input.add.func()
+    local control = options.auras.args["number:49010"].args.enabled
+    control.set({}, false)
+    for _, id in ipairs({49010, 24131}) do
+        state.auras.HARMFUL = {{name = "Wyvern Sting", id = id}}
+        alerts:UNIT_AURA(nil, "arena1")
+        equal(#state.sounds, 0, "every listed ID stays silent while disabled")
+        equal(state.flashes.arena1, nil, "every listed ID stays without flashing while disabled")
+    end
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 19386}}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 1, "unlisted IDs still use the separate name rule")
+    control.set({}, true)
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 24131}}
+    alerts:UNIT_AURA(nil, "arena1")
+    equal(#state.sounds, 2, "reenabling restores every listed exact ID")
 end)
 
 test("aura sounds follow exact spell rules without repeating on refresh", function()

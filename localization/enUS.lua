@@ -29,6 +29,8 @@ L["Enter a spell name or a positive whole spell ID."] = true
 L["Names match all ranks and effects with that name. Numeric IDs match only that exact spell and override name rules. Priority 0 hides the matching aura. Deleting an ID rule restores name matching."] = true
 
 -- Alerts module
+L["Enable aura alert"] = true
+L["Enable sound and flashing for this aura. Turn off to keep its settings for later."] = true
 L["Disable alerts while dead"] = true
 L["Disable alert sounds and flashing while you are dead or a ghost."] = true
 L["Alert sound"] = true
