@@ -86,8 +86,8 @@ local function reset()
         button.alpha, button.shown = 1, true
         button.SetAlpha = function(self, alpha) self.alpha = alpha end
         button.IsShown = function(self) return self.shown end
-        button.Show = function(self) self.shown = true end
-        button.Hide = function(self) self.shown = false end
+        button.Show = function(self) assert(not combat, "protected Show in combat"); self.shown = true end
+        button.Hide = function(self) assert(not combat, "protected Hide in combat"); self.shown = false end
     end
     addon.arena_parent = {Hide = noop, IsShown = function() return true end}
     addon.party_parent = {Hide = noop, IsShown = function() return true end}
@@ -147,6 +147,93 @@ test("a previous enemy joining the party loses its cached enemy identity", funct
     equal(addon.buttons.arena1.confirmedDead, nil, "old enemy death")
     units.arena1 = {}
     equal(tagFunctions.name("arena1"), "unknown", "no stale teammate after token disappears")
+end)
+
+for _, duringCombat in ipairs({false, true}) do
+    test("party2 becoming party1 clears the old slot, combat=" .. tostring(duringCombat), function()
+        partyCount = 2
+        units.party2 = person("remaining", "Remaining", "ROGUE")
+        addon:PARTY_MEMBERS_CHANGED()
+        addon.buttons.party1.specID, addon.buttons.party2.specID = 256, 261
+        equal(addon.buttons.party2.text, "Remaining", "old survivor slot")
+
+        combat = duringCombat
+        units.party1, units.party2 = units.party2, {}
+        partyCount = 1
+        addon:PARTY_MEMBERS_CHANGED()
+
+        local oldSlot = addon.buttons.party2
+        equal(oldSlot.alpha, 0, "obsolete party slot hidden immediately")
+        equal(oldSlot.soft_hidden, true, "obsolete party slot stays hidden")
+        equal(oldSlot.guid, nil, "obsolete identity cleared")
+        equal(oldSlot.knownName, nil, "obsolete name cleared")
+        equal(oldSlot.class, nil, "obsolete class cleared")
+        equal(oldSlot.specID, nil, "obsolete specialization cleared")
+        equal(addon:GetUnitIdByGUID("remaining"), "party1", "survivor follows its new unit ID")
+        equal(addon:GetUnitIdByGUID("teammate"), nil, "departed member removed")
+        equal(addon.buttons.party1.text, "Remaining", "new survivor slot refreshed immediately")
+        equal(addon.buttons.party1.class, "ROGUE", "new survivor class refreshed")
+        equal(addon.buttons.party1.specID, nil, "survivor cannot inherit departed member's spec")
+
+        addon:UNIT_NAME_UPDATE("UNIT_NAME_UPDATE", "party2")
+        addon:UNIT_HEALTH("UNIT_HEALTH", "party2")
+        addon:UpdateUnitGUID("UNIT_PORTRAIT_UPDATE", "party2")
+        equal(oldSlot.alpha, 0, "late events cannot restore obsolete slot")
+        equal(tagFunctions.name("party2"), "party2", "late events cannot restore cached survivor name")
+
+        combat = false
+        addon:PLAYER_REGEN_ENABLED()
+        equal(oldSlot.alpha, 0, "deferred refresh keeps obsolete slot hidden")
+        equal(oldSlot.guid, nil, "deferred refresh keeps obsolete identity cleared")
+        equal(addon.buttons.party1.text, "Remaining", "survivor stays in party1")
+    end)
+end
+
+test("the last teammate leaving in combat hides its party frame", function()
+    addon:PARTY_MEMBERS_CHANGED()
+    combat = true
+    partyCount, units.party1 = 0, {}
+    addon:PARTY_MEMBERS_CHANGED()
+    equal(addon.buttons.party1.alpha, 0, "departed teammate hidden")
+    equal(addon.buttons.party1.guid, nil, "departed teammate identity cleared")
+    equal(addon:GetUnitIdByGUID("teammate"), nil, "departed teammate lookup cleared")
+    equal(addon.buttons.player.text, "Me", "player remains visible")
+end)
+
+test("a combat roster refresh preserves dead members and the hide-self setting", function()
+    addon.db.base.hideSelf = true
+    addon:PARTY_MEMBERS_CHANGED()
+    combat = true
+    units.party1.dead, units.party1.health = true, 0
+    addon:PARTY_MEMBERS_CHANGED()
+    equal(addon.buttons.player.alpha, 0, "hidden player stays hidden")
+    equal(addon.buttons.party1.alpha, 1, "dead teammate keeps its slot")
+    equal(addon.buttons.party1.text, "DEAD", "dead teammate display refreshed")
+    equal(addon.buttons.party1.guid, "teammate", "dead teammate identity retained")
+end)
+
+test("a party slot vacated during combat can be reused before combat ends", function()
+    addon:PARTY_MEMBERS_CHANGED()
+    combat = true
+    partyCount, units.party1 = 0, {}
+    addon:PARTY_MEMBERS_CHANGED()
+    equal(addon.buttons.party1.alpha, 0, "vacant slot hidden")
+    partyCount, units.party1 = 1, person("replacement", "Replacement", "ROGUE")
+    addon:PARTY_MEMBERS_CHANGED()
+    equal(addon.buttons.party1.alpha, 1, "occupied slot visible again")
+    equal(addon.buttons.party1.text, "Replacement", "replacement display refreshed")
+    equal(addon.buttons.party1.guid, "replacement", "replacement identity refreshed")
+end)
+
+test("party identity is retained for synthetic test and spectator units", function()
+    for _, mode in ipairs({"test", "spectator"}) do
+        testing, spectating = mode == "test", mode == "spectator"
+        addon:UpdateAllGUIDs()
+        units.party1.exists = nil
+        addon:UpdateUnitGUID("UNIT_PORTRAIT_UPDATE", "party1")
+        equal(addon.buttons.party1.guid, "teammate", mode .. " identity retained")
+        equal(addon.buttons.party1.alpha, 1, mode .. " row stays visible")
+    end
 end)
 
 for _, event in ipairs({"seen", "name", "refresh"}) do

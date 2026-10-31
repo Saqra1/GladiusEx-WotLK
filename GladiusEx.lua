@@ -895,6 +895,19 @@ end
 function GladiusEx:PARTY_MEMBERS_CHANGED()
     if self:IsArenaShown() or self:IsPartyShown() then
         self:UpdateAllGUIDs()
+        -- Unit IDs can change in combat even though layout updates must wait.
+        -- Refresh existing rows now so they follow the current party roster.
+        if InCombatLockdown() and not self:IsTesting() and not self:IsSpectating() then
+            for unit in pairs(party_units) do
+                if self.buttons[unit] and UnitExists(unit) then
+                    if unit ~= "player" or not self.db.base.hideSelf then
+                        self:ShowUnit(unit)
+                    end
+                    self:UpdateUnitState(unit)
+                    self:RefreshUnit(unit)
+                end
+            end
+        end
         local u = self:CheckArenaSize()
         if not u then
             self:UpdateFrames()
@@ -967,8 +980,11 @@ function GladiusEx:UpdateUnitGUID(event, unit)
         local guid = UnitGUID(unit)
         local button = self.buttons[unit]
         local friendly = self:IsFriendlyArenaUnit(unit)
+        local missingParty = party_units[unit] and not UnitExists(unit)
+            and not self:IsTesting() and not self:IsSpectating()
         if button then
-            if (friendly and not button.rejectedFriendly) or (guid and button.guid and button.guid ~= guid) then
+            if (friendly and not button.rejectedFriendly) or (guid and button.guid and button.guid ~= guid)
+                or (missingParty and (button.guid or button.knownName)) then
                 button.class = nil
                 button.specID = nil
                 button.knownName = nil
@@ -981,13 +997,17 @@ function GladiusEx:UpdateUnitGUID(event, unit)
             if friendly then
                 button.rejectedFriendly = true
                 self:HideUnit(unit)
+            elseif missingParty then
+                -- Unlike an unseen enemy, an empty party slot has no identity
+                -- to retain. Hide it even while the full refresh is queued.
+                self:HideUnit(unit)
             elseif guid then
                 button.guid = guid
             end
         end
         -- Arena tokens can still refer to a current teammate while zoning.
         -- Do not let an enemy slot replace that teammate's party GUID lookup.
-        if friendly then return end
+        if friendly or missingParty then return end
         guid = guid and guid or unit -- fix for Spectator mode (in which case unit would be a guid itself)
         
         if guid then
