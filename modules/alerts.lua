@@ -104,6 +104,7 @@ function Alerts:OnEnable()
     self:RegisterEvent("PLAYER_ALIVE", "UpdatePlayerState")
     self:RegisterEvent("PLAYER_UNGHOST", "UpdatePlayerState")
     self:RegisterEvent("UNIT_AURA")
+    self:RegisterMessage("GLADIUSEX_SPEC_UPDATE", "UNIT_AURA")
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self:RegisterEvent("UNIT_HEALTH")
     self:RegisterEvent("UNIT_NAME_UPDATE", "UNIT_HEALTH")
@@ -122,6 +123,7 @@ end
 
 function Alerts:OnDisable()
     self:UnregisterAllEvents()
+    self:UnregisterAllMessages()
 
     for unit in pairs(self.frame) do
         self.frame[unit]:SetAlpha(0)
@@ -257,15 +259,18 @@ function Alerts:PlayAlertSound(sound)
     if path and path ~= "" then PlaySoundFile(path) end
 end
 
-function Alerts:SetAlert(unit, alert, priority, color, sound, flash)
+function Alerts:SetAlert(unit, alert, priority, color, sound, flash, deferSound)
     assert(type(unit) == "string")
     assert(type(alert) == "string")
     assert(type(priority) == "number")
     assert(type(color) == "table")
-    if not alerts[unit] then alerts[unit] = { count = 0, priority = 0, current = false, alerts = {}, flash = {} } end
+    if not alerts[unit] then
+        alerts[unit] = { count = 0, priority = 0, current = false, alerts = {}, flash = {}, pendingSounds = {} }
+    end
     if not alerts_color[unit] then alerts_color[unit] = {} end
 
-    if not alerts[unit].alerts[alert] then
+    local new = not alerts[unit].alerts[alert]
+    if new then
         alerts[unit].alerts[alert] = priority
         alerts[unit].flash[alert] = flash ~= false
         alerts_color[unit][alert] = color
@@ -277,10 +282,17 @@ function Alerts:SetAlert(unit, alert, priority, color, sound, flash)
             alerts[unit].current = alert
             self:StartFlash(unit, color)
         end
-        if not suppressed and unit ~= "player" and self:IsUnitEnabled(unit) then self:PlayAlertSound(sound) end
     elseif alerts[unit].flash[alert] ~= (flash ~= false) then
         alerts[unit].flash[alert] = flash ~= false
         self:UpdateAlertColor(unit)
+    end
+    -- Only the aura scan resolves deferred healer sounds. Other updates, such
+    -- as toggling the flash, must not consume or bypass that pending decision.
+    if new or (alerts[unit].pendingSounds[alert] and deferSound == false) then
+        alerts[unit].pendingSounds[alert] = deferSound
+        if not deferSound and not self:IsSuppressed(unit) and unit ~= "player" and self:IsUnitEnabled(unit) then
+            self:PlayAlertSound(sound)
+        end
     end
 end
 
@@ -323,6 +335,7 @@ end
 function Alerts:ClearAlert(unit, alert, count)
     if alerts[unit] and alerts[unit].alerts[alert] then
         alerts[unit].alerts[alert] = false
+        alerts[unit].pendingSounds[alert] = nil
         alerts[unit].count = alerts[unit].count - 1
 
         if count and count > 0 then
@@ -366,11 +379,14 @@ function Alerts:UNIT_AURA(event, unit)
     end
     for key, aura in pairs(active) do
         local sound = self:GetAlertSound(unit, aura.sound)
+        local deferSound = false
         if aura.healerOnlySound and GladiusEx:IsPartyUnit(unit) then
             local button = GladiusEx.buttons[unit]
-            if not button or not healerSpecs[button.specID] then sound = nil end
+            local specID = button and button.specID
+            deferSound = not specID
+            if not healerSpecs[specID] then sound = nil end
         end
-        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color, sound, aura.flash)
+        self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color, sound, aura.flash, deferSound)
     end
     self.auraAlertKeys[unit] = active
 end

@@ -64,6 +64,9 @@ ns.AuraMapping = {
     -- PRIEST
 
 	[47540]	= {specID = 256, checkSource = true, }, -- Penance
+    [53005] = {specID = 256, checkSource = true, }, -- Penance (Rank 2)
+    [53006] = {specID = 256, checkSource = true, }, -- Penance (Rank 3)
+    [53007] = {specID = 256, checkSource = true, }, -- Penance (Rank 4)
 	[10060]	= {specID = 256, checkSource = true, }, -- Power Infusion
 	[33206]	= {specID = 256, checkSource = true, }, -- Pain Suppression
 	[47517]	= {specID = 256, checkSource = true, }, -- Grace

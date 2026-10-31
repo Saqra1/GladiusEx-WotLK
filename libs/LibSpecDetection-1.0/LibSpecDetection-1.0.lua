@@ -53,7 +53,7 @@
 ]]
 
 -- Define the library and dependencies
-local MAJOR, MINOR = "LibSpecDetection-1.0", 1
+local MAJOR, MINOR = "LibSpecDetection-1.0", 2
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end -- already loaded
 
@@ -297,9 +297,9 @@ local function OnCombatLogEventUnfiltered(...)
     local subEvent, srcGUID, srcFlags, spellID
 
     if data.isMoP or data.isCata then
-        _, subEvent, _, srcGUID, srcFlags, _, _, _, _, _, _, spellID = ...
+        _, subEvent, _, srcGUID, _, srcFlags, _, _, _, _, _, spellID = ...
     else
-        _, subEvent, srcGUID, srcFlags, _, _, _, _, spellID = ...
+        _, subEvent, srcGUID, _, srcFlags, _, _, _, spellID = ...
     end
 
     if subEvent == "SPELL_CAST_SUCCESS" then
