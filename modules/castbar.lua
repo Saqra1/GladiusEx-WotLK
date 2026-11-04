@@ -6,7 +6,6 @@ local LSM = LibStub("LibSharedMedia-3.0")
 -- global functions
 local strfind, strformat = string.find, string.format
 local pairs = pairs
-local min = math.min
 local GetTime = GetTime
 local UnitCastingInfo, UnitChannelInfo = UnitCastingInfo, UnitChannelInfo
 
@@ -163,7 +162,11 @@ end
 
 function CastBar:UNIT_SPELLCAST_DELAYED(event, unit)
     if not self.frame[unit] then return end
-    if not self.frame[unit].isCasting or self.frame[unit].isChanneling then return end
+    if event == "UNIT_SPELLCAST_DELAYED" then
+        if not self.frame[unit].isCasting then return end
+    elseif not self.frame[unit].isChanneling then
+        return
+    end
 
     local spell, rank, displayName, icon, startTime, endTime, isTradeSkill
     if event == "UNIT_SPELLCAST_DELAYED" then
@@ -177,12 +180,13 @@ function CastBar:UNIT_SPELLCAST_DELAYED(event, unit)
     if event == "UNIT_SPELLCAST_DELAYED" then
         self.frame[unit].delay = self.frame[unit].delay + (startTime / 1000 - self.frame[unit].startTime)
     else
-        self.frame[unit].delay = self.frame[unit].delay + (self.startTime - startTime / 1000)
+        self.frame[unit].delay = self.frame[unit].delay + (self.frame[unit].startTime - startTime / 1000)
     end
 
     self.frame[unit].startTime = startTime / 1000
     self.frame[unit].endTime = endTime / 1000
-    self.frame[unit].bar:SetMinMaxValues(0, (endTime - startTime) / 1000)
+    self.frame[unit].maxValue = (endTime - startTime) / 1000
+    self.frame[unit].bar:SetMinMaxValues(0, self.frame[unit].maxValue)
 end
 
 function CastBar:SetInterruptible(unit, interruptible)
@@ -203,7 +207,11 @@ end
 local delay_format = " +%.01f"
 local function CastUpdate(self)
     if self.isCasting or self.isChanneling then
-        local currentTime = min(self.endTime, GetTime())
+        local currentTime = GetTime()
+        if currentTime >= self.endTime then
+            CastBar:CastEnd(self)
+            return
+        end
         local value = self.endTime - currentTime
 
         if (self.isChanneling and CastBar.db[self.unit].castBarInverse) or (self.isCasting and not CastBar.db[self.unit].castBarInverse) then
@@ -228,19 +236,21 @@ function CastBar:CastStart(unit, channel)
 
     local spell, rank, displayName, icon, startTime, endTime, isTradeSkill, castID, notInterruptible
     if channel then
-        spell, rank, displayName, icon, startTime, endTime, isTradeSkill, castID, notInterruptible = UnitChannelInfo(unit)
+        spell, rank, displayName, icon, startTime, endTime, isTradeSkill, notInterruptible = UnitChannelInfo(unit)
     else
         spell, rank, displayName, icon, startTime, endTime, isTradeSkill, castID, notInterruptible = UnitCastingInfo(unit)
     end
 
-    if spell then
+    if spell and startTime and endTime and endTime > startTime and endTime > GetTime() * 1000 then
+        local sameCast = f.spellName == spell and f.isChanneling == channel
+            and f.startTime == startTime / 1000 and f.endTime == endTime / 1000
         f.spellName = spell
         f.isChanneling = channel
         f.isCasting = not channel
         f.startTime = startTime / 1000
         f.endTime = endTime / 1000
         f.maxValue = f.endTime - f.startTime
-        f.delay = 0
+        f.delay = sameCast and f.delay or 0
 
         f.icon:SetTexture(icon)
 
@@ -252,12 +262,15 @@ function CastBar:CastStart(unit, channel)
         f:SetScript("OnUpdate", CastUpdate)
         CastUpdate(f)
         UpdateCastText(f, spell, rank)
+        return true
     end
 end
 
 function CastBar:CastEnd(frame)
     frame.isCasting = false
     frame.isChanneling = false
+    frame.spellName = nil
+    frame:SetScript("OnUpdate", nil)
     frame.timeText:SetText("")
     frame.castText:SetText("")
     frame.icon:SetTexture("")
@@ -461,6 +474,17 @@ end
 function CastBar:Show(unit)
     -- show frame
     self.frame[unit]:Show()
+end
+
+function CastBar:Refresh(unit)
+    if not self.frame[unit] then return end
+    -- Spectator casts are supplied by events rather than native unit tokens.
+    if GladiusEx:IsSpectating() then return end
+
+    -- A roster change can assign this slot to someone else without a cast event.
+    if not self:CastStart(unit, false) and not self:CastStart(unit, true) then
+        self:CastEnd(self.frame[unit])
+    end
 end
 
 function CastBar:Reset(unit)
