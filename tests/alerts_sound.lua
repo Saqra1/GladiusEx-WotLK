@@ -25,6 +25,11 @@ local function setup()
     end
     local state = harness.setup(nil, true)
     state.addon.buttons = {}
+    state.classes = {}
+    UnitClass = function(unit)
+        local class = state.classes[unit]
+        if class then return "Localized " .. class, class end
+    end
     GetLocale = function() return "enUS" end
     local path = "libs/LibSharedMedia-3.0/LibSharedMedia-3.0/LibSharedMedia-3.0.lua"
     local file = assert(io.open(path, "rb"))
@@ -241,50 +246,108 @@ test("party health, aura and cast sounds exclude the player while keeping visual
     end
 end)
 
-test("healer-only party aura sounds require a healing specialization", function()
+test("healer-only party aura sounds use class only while specialization is unknown", function()
     local state, alerts = setup()
     alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
     state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
     local expectedSounds = 0
-    for _, spec in ipairs({
-        {65, true}, {105, true}, {256, true}, {257, true}, {264, true},
-        {66, false}, {70, false}, {102, false}, {103, false}, {258, false},
-        {262, false}, {263, false}, {250, false}, {62, false}, {false, false},
+    for class, info in pairs({
+        PALADIN = {{65, true}, {66, false}, {70, false}, {false, true}},
+        DRUID = {{102, false}, {103, false}, {105, true}, {false, true}},
+        PRIEST = {{256, true}, {257, true}, {258, false}, {false, true}},
+        SHAMAN = {{262, false}, {263, false}, {264, true}, {false, true}},
+        DEATHKNIGHT = {{250, false}, {251, false}, {252, false}, {false, false}},
+        MAGE = {{62, false}, {63, false}, {64, false}, {false, false}},
+        HUNTER = {{253, false}, {254, false}, {255, false}, {false, false}},
+        ROGUE = {{259, false}, {260, false}, {261, false}, {false, false}},
+        WARLOCK = {{265, false}, {266, false}, {267, false}, {false, false}},
+        WARRIOR = {{71, false}, {72, false}, {73, false}, {false, false}},
     }) do
-        alerts:Reset("party1")
-        state.addon.buttons.party1 = {specID = spec[1] or nil}
-        alerts:UNIT_AURA(nil, "party1")
-        if spec[2] then expectedSounds = expectedSounds + 1 end
-        equal(#state.sounds, expectedSounds, "specialization " .. tostring(spec[1]))
-        equal(state.flashes.party1, color, "healer filtering preserves flashing")
-        equal(alerts:IsAlertActive("party1", "aura_number:49010"), 20, "visual alert remains active")
-        alerts:UNIT_AURA(nil, "party1")
-        equal(#state.sounds, expectedSounds, "repeated aura events do not replay sound")
+        for _, spec in ipairs(info) do
+            alerts:Reset("party1")
+            state.classes.party1 = class
+            state.addon.buttons.party1 = {class = class, specID = spec[1] or nil}
+            alerts:UNIT_AURA(nil, "party1")
+            if spec[2] then expectedSounds = expectedSounds + 1 end
+            equal(#state.sounds, expectedSounds, class .. " specialization " .. tostring(spec[1]))
+            equal(state.flashes.party1, color, "class filtering preserves flashing")
+            equal(alerts:IsAlertActive("party1", "aura_number:49010"), 20, "visual alert remains active")
+            alerts:UNIT_AURA(nil, "party1")
+            equal(#state.sounds, expectedSounds, "repeated aura events do not replay sound")
+        end
     end
     equal(state.sounds[1], soundPath, "selected sound is used")
     alerts.frame.party4 = {}
     alerts:UNIT_AURA(nil, "party4")
-    equal(#state.sounds, expectedSounds, "a missing unit button cannot identify a healer")
-    state.addon.buttons.party1 = {specID = 256}
+    equal(#state.sounds, expectedSounds, "a missing class stays silent")
+    state.classes.party1 = "PRIEST"
+    state.addon.buttons.party1 = {class = "PRIEST", specID = 256}
     state.auras.HARMFUL = {}
     alerts:UNIT_AURA(nil, "party1")
     state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
     alerts.db.party.aurasSpells[49010].flash = false
     alerts:UNIT_AURA(nil, "party1")
-    equal(#state.sounds, expectedSounds + 1, "reapplied CC sounds again on a healer")
-    equal(state.flashes.party1, nil, "healer-only sound works with flashing disabled")
+    equal(#state.sounds, expectedSounds + 1, "reapplied CC sounds again on a healing class")
+    equal(state.flashes.party1, nil, "healing-class sound works with flashing disabled")
+end)
+
+test("unknown specs use the live class before the cached class without requiring a button", function()
+    local state, alerts = setup()
+    alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
+    state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}}
+    state.classes = {party1 = "PRIEST", party2 = "SHAMAN", party4 = "MAGE"}
+    state.addon.buttons = {
+        party1 = {class = "MAGE"}, party3 = {class = "DRUID"}, party4 = {class = "PALADIN"},
+    }
+    for index, expected in ipairs({1, 2, 3, 3}) do
+        local unit = "party" .. index
+        alerts:UNIT_AURA(nil, unit)
+        equal(#state.sounds, expected, unit .. " class fallback")
+        alerts:UNIT_AURA(nil, unit)
+        equal(#state.sounds, expected, "refresh does not repeat the fallback sound")
+    end
+end)
+
+test("unavailable class and spec defer sound until either identifies a healer", function()
+    local state, alerts = setup()
+    alerts.db.party.aurasSpells[6358] = {
+        priority = 30, color = color, sound = soundName, flash = false, healerOnlySound = true,
+    }
+    state.addon.buttons.party1 = {}
+    state.auras.HARMFUL = {{name = "Seduction", id = 6358}}
+    for index, resolution in ipairs({"class", "spec"}) do
+        alerts:Reset("party1")
+        state.classes.party1 = nil
+        state.addon.buttons.party1.specID = nil
+        alerts:UNIT_AURA(nil, "party1")
+        equal(#state.sounds, index - 1, "no class or spec keeps the sound pending")
+        local controls = alerts:GetOptions("party").auras.args["number:6358"].args
+        controls.flash.set({}, true)
+        controls.flash.set({}, false)
+        equal(#state.sounds, index - 1, "flash controls do not bypass pending detection")
+        if resolution == "class" then
+            state.classes.party1 = "PRIEST"
+        else
+            state.addon.buttons.party1.specID = 257
+        end
+        alerts:UNIT_AURA(nil, "party1")
+        equal(#state.sounds, index, resolution .. " releases the pending sound")
+        alerts:UNIT_AURA(nil, "party1")
+        equal(#state.sounds, index, "the pending sound plays only once")
+    end
 end)
 
 test("healer-only aura sound is optional per rule and does not filter other alert kinds or arena", function()
     local state, alerts = setup()
-    state.addon.buttons.party1 = {specID = 258}
+    state.classes.party1 = "PRIEST"
+    state.addon.buttons.party1 = {class = "PRIEST", specID = 258}
     alerts.db.party.healthSound = soundName
     alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
     alerts.db.party.aurasSpells[118] = {priority = 10, color = color, sound = soundName}
     alerts.db.party.castsSpells[49010] = {priority = 30, color = color, sound = soundName}
     state.auras.HARMFUL = {{name = "Wyvern Sting", id = 49010}, {name = "Polymorph", id = 118}}
     alerts:UNIT_AURA(nil, "party1")
-    equal(#state.sounds, 1, "an unrestricted rule still sounds on a damage spec")
+    equal(#state.sounds, 1, "an unrestricted rule still sounds on a known damage spec")
     alerts:UNIT_HEALTH(nil, "party1")
     alerts:UNIT_SPELLCAST_START(nil, "party1", 49010)
     equal(#state.sounds, 3, "health and cast sounds still work on damage specs")
@@ -297,7 +360,7 @@ test("healer-only aura sound is optional per rule and does not filter other aler
     equal(#state.sounds, 6, "turning the filter off restores sounds for any party specialization")
 end)
 
-test("Seduction sounds once when a teammate priest's healing spec is detected late", function()
+test("Seduction sounds immediately on a priest before spec detection and never repeats on detection", function()
     local state, alerts = setup()
     local messages = {}
     alerts.RegisterEvent = function() end
@@ -308,47 +371,61 @@ test("Seduction sounds once when a teammate priest's healing spec is detected la
     alerts.db.party.aurasSpells[6358] = {
         priority = 30, color = color, sound = "", flash = false, healerOnlySound = true,
     }
-    state.addon.buttons.party1 = {}
+    state.classes.party1 = "PRIEST"
+    state.addon.buttons.party1 = {class = "PRIEST"}
     state.auras.HARMFUL = {{name = "Seduction", id = 6358}}
     alerts:UNIT_AURA(nil, "party1")
     alerts:UNIT_AURA(nil, "party1")
-    equal(#state.sounds, 0, "unknown specs stay silent")
+    equal(#state.sounds, 1, "a priest with no detected spec sounds immediately")
     equal(alerts:IsAlertActive("party1", "aura_number:6358"), 30, "aura is already tracked")
     local controls = alerts:GetOptions("party").auras.args["number:6358"].args
     controls.flash.set({}, true)
     controls.flash.set({}, false)
-    equal(#state.sounds, 0, "flash controls do not bypass pending healer detection")
+    equal(#state.sounds, 1, "flash controls do not repeat the sound")
     local flashStarts = state.flashStarts
     state.addon.buttons.party1.specID = 256
     alerts[specUpdate](alerts, "GLADIUSEX_SPEC_UPDATE", "party1")
-    equal(#state.sounds, 1, "late Discipline detection releases the pending sound")
+    equal(#state.sounds, 1, "late Discipline detection does not repeat the sound")
     equal(state.sounds[1], soundPath, "general sound is inherited")
     equal(state.flashes.party1, nil, "sound-only aura stays hidden")
     equal(state.flashStarts, flashStarts, "late detection does not restart the flash")
     alerts[specUpdate](alerts, "GLADIUSEX_SPEC_UPDATE", "party1")
     alerts:UNIT_AURA(nil, "party1")
     equal(#state.sounds, 1, "spec and aura refreshes do not repeat the sound")
+    alerts:Reset("party1")
+    state.addon.buttons.party1.specID = nil
+    alerts:UNIT_AURA(nil, "party1")
+    state.auras.HARMFUL = {}
+    alerts:UNIT_AURA(nil, "party1")
+    state.addon.buttons.party1.specID = 258
+    alerts[specUpdate](alerts, "GLADIUSEX_SPEC_UPDATE", "party1")
+    equal(#state.sounds, 2, "short CC still sounds even if it ends before spec detection")
+    state.auras.HARMFUL = {{name = "Seduction", id = 6358}}
+    alerts:UNIT_AURA(nil, "party1")
+    equal(#state.sounds, 2, "the next CC stays silent once Shadow is detected")
 end)
 
 for _, scenario in ipairs({"dead", "disabled", "player"}) do
-    test("late healer detection respects " .. scenario .. " sound suppression", function()
+    test("class fallback respects " .. scenario .. " sound suppression before and after spec detection", function()
         local state, alerts = setup()
         local unit = scenario == "player" and "player" or "party1"
         alerts.db.party.aurasSpells[6358] = {
             priority = 30, color = color, sound = soundName, flash = false, healerOnlySound = true,
         }
-        state.addon.buttons[unit] = {}
+        state.classes[unit] = "PRIEST"
+        state.addon.buttons[unit] = {class = "PRIEST"}
         state.auras.HARMFUL = {{name = "Seduction", id = 6358}}
-        alerts:UNIT_AURA(nil, unit)
         if scenario == "dead" then
             alerts.db.party.disableWhenDead = true
             state.player.dead = true
         elseif scenario == "disabled" then
             alerts.IsUnitEnabled = function() return false end
         end
+        alerts:UNIT_AURA(nil, unit)
+        equal(#state.sounds, 0, "immediate sound obeys existing suppression")
         state.addon.buttons[unit].specID = 256
         alerts:UNIT_AURA(nil, unit)
-        equal(#state.sounds, 0, "pending sound obeys existing suppression")
+        equal(#state.sounds, 0, "spec detection does not bypass suppression")
         state.player.dead = false
         alerts.IsUnitEnabled = function() return true end
         alerts:UNIT_AURA(nil, unit)
@@ -356,7 +433,7 @@ for _, scenario in ipairs({"dead", "disabled", "player"}) do
     end)
 end
 
-test("pending healer sounds are discarded for damage specs, removed auras and resets", function()
+test("pending class sounds are discarded for other classes, removed auras and resets", function()
     local state, alerts = setup()
     alerts.db.party.aurasSpells[6358] = {
         priority = 30, color = color, sound = soundName, healerOnlySound = true,
@@ -364,29 +441,29 @@ test("pending healer sounds are discarded for damage specs, removed auras and re
     state.addon.buttons.party1 = {}
     state.auras.HARMFUL = {{name = "Seduction", id = 6358}}
     alerts:UNIT_AURA(nil, "party1")
-    state.addon.buttons.party1.specID = 258
+    state.classes.party1 = "MAGE"
     alerts:UNIT_AURA(nil, "party1")
-    equal(#state.sounds, 0, "Shadow detection remains silent")
-    state.addon.buttons.party1.specID = 256
+    equal(#state.sounds, 0, "a mage remains silent")
+    state.classes.party1 = "PRIEST"
     alerts:UNIT_AURA(nil, "party1")
-    equal(#state.sounds, 0, "a resolved damage spec does not leave a pending sound")
+    equal(#state.sounds, 0, "a resolved other class does not leave a pending sound")
     alerts:Reset("party1")
-    state.addon.buttons.party1.specID = nil
+    state.classes.party1 = nil
     alerts:UNIT_AURA(nil, "party1")
     state.auras.HARMFUL = {}
     alerts:UNIT_AURA(nil, "party1")
-    state.addon.buttons.party1.specID = 257
+    state.classes.party1 = "PRIEST"
     alerts:UNIT_AURA(nil, "party1")
     equal(#state.sounds, 0, "expired Seduction cannot sound after detection")
     state.auras.HARMFUL = {{name = "Seduction", id = 6358}}
     alerts:UNIT_AURA(nil, "party1")
-    equal(#state.sounds, 1, "new application on a known healer sounds normally")
+    equal(#state.sounds, 1, "new application on a known healing class sounds normally")
     alerts:Reset("party1")
-    state.addon.buttons.party1.specID = nil
+    state.classes.party1 = nil
     alerts:UNIT_AURA(nil, "party1")
     alerts:Reset("party1")
     state.auras.HARMFUL = {}
-    state.addon.buttons.party1.specID = 256
+    state.classes.party1 = "PRIEST"
     alerts:UNIT_AURA(nil, "party1")
     equal(#state.sounds, 1, "reset discards pending sounds")
 end)

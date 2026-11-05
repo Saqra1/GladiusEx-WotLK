@@ -40,7 +40,7 @@ L["Leave blank or select None to use the general sound. Select a sound to overri
 L["Flash frame"] = true
 L["Flash the unit frame while this aura is active. Sound works independently."] = true
 L["Healer-only sound"] = true
-L["Only play this aura's sound for party members with a detected healing specialization. Unknown specializations stay silent."] = true
+L["Only play this aura's sound for party healers. While specialization is unknown, include priests, paladins, druids and shamans."] = true
 
 -- Cooldowns module
 L["cat:pvp_trinket"] = "PvP Trinket"

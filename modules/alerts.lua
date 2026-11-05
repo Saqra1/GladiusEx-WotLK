@@ -18,6 +18,13 @@ local healerSpecs = {
     [264] = true, -- Restoration shaman
 }
 
+local healingClasses = {
+    PALADIN = true,
+    DRUID = true,
+    PRIEST = true,
+    SHAMAN = true,
+}
+
 local function MigrateSoundOverride(settings, soundKey, overrideKey)
     if settings[overrideKey] == false then settings[soundKey] = "None" end
     settings[overrideKey] = nil
@@ -383,8 +390,14 @@ function Alerts:UNIT_AURA(event, unit)
         if aura.healerOnlySound and GladiusEx:IsPartyUnit(unit) then
             local button = GladiusEx.buttons[unit]
             local specID = button and button.specID
-            deferSound = not specID
-            if not healerSpecs[specID] then sound = nil end
+            if specID then
+                if not healerSpecs[specID] then sound = nil end
+            else
+                local _, class = UnitClass(unit)
+                class = class or (button and button.class)
+                deferSound = not class
+                if not healingClasses[class] then sound = nil end
+            end
         end
         self:SetAlert(unit, "aura_" .. key, aura.priority, aura.color, sound, aura.flash, deferSound)
     end
@@ -792,7 +805,7 @@ function Alerts:GetOptions(unit)
                         },
                         healerOnlySound = {
                             type = "toggle", name = L["Healer-only sound"], order = 4.5,
-                            desc = L["Only play this aura's sound for party members with a detected healing specialization. Unknown specializations stay silent."],
+                            desc = L["Only play this aura's sound for party healers. While specialization is unknown, include priests, paladins, druids and shamans."],
                             hidden = unit ~= "party" and not GladiusEx:IsPartyUnit(unit),
                             get = function() return newAuraHealerOnlySound end,
                             set = function(info, value) newAuraHealerOnlySound = value end,
@@ -922,7 +935,7 @@ function Alerts:SetupSpellOptions(options, unit, spell, field, kind)
         }
         group.args.healerOnlySound = {
             type = "toggle", name = L["Healer-only sound"], order = 4.5, disabled = disabled,
-            desc = L["Only play this aura's sound for party members with a detected healing specialization. Unknown specializations stay silent."],
+            desc = L["Only play this aura's sound for party healers. While specialization is unknown, include priests, paladins, druids and shamans."],
             hidden = unit ~= "party" and not GladiusEx:IsPartyUnit(unit),
             get = function() return not not self.db[unit][field][spell].healerOnlySound end,
             set = function(info, value) self.db[unit][field][spell].healerOnlySound = value end,
