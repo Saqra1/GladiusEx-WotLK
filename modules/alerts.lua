@@ -372,12 +372,18 @@ function Alerts:UNIT_AURA(event, unit)
     if not self.db[unit].auras then return end
 
     local active = {}
+    local mindControlName = GetSpellInfo(605)
     for _, filter in ipairs({"HELPFUL", "HARMFUL"}) do
         for index = 1, 40 do
             local name, _, _, _, _, _, _, _, _, _, id = UnitAura(unit, index, filter)
             if not name then break end
             local aura, key = GladiusEx:GetSpellRule(self.db[unit], "aurasSpells", name, id)
-            if aura and aura.enabled ~= false then active[GladiusEx:SpellRuleKey(key)] = aura end
+            -- Mind Control can also appear on the priest channeling it. Only
+            -- alert for the controlled unit, regardless of the aura's filter.
+            local mindControl = id == 605 or name == mindControlName
+            if aura and aura.enabled ~= false and (not mindControl or UnitIsCharmed(unit)) then
+                active[GladiusEx:SpellRuleKey(key)] = aura
+            end
         end
     end
     self.auraAlertKeys = self.auraAlertKeys or {}

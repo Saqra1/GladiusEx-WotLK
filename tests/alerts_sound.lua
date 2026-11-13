@@ -246,6 +246,48 @@ test("party health, aura and cast sounds exclude the player while keeping visual
     end
 end)
 
+for _, exact in ipairs({false, true}) do
+    test("Mind Control aura alerts identify the victim with " .. (exact and "ID" or "name") .. " rules", function()
+        local state, alerts = setup()
+        local name = GetSpellInfo(605)
+        local key = exact and 605 or name
+        local alert = "aura_" .. state.addon:SpellRuleKey(key)
+        local charmed = {}
+        UnitIsCharmed = function(unit) return charmed[unit] end
+        alerts.db.party.aurasSpells[key] = {priority = 20, color = color, sound = soundName}
+        for _, filter in ipairs({"HELPFUL", "HARMFUL"}) do
+            state.auras[filter] = {{name = name, id = 605}}
+            alerts:UNIT_AURA(nil, "party1")
+            equal(alerts:IsAlertActive("party1", alert), nil, "channeling priest has no victim alert")
+            equal(state.flashes.party1, nil, "channeling priest does not flash")
+            local before = #state.sounds
+            charmed.party2 = 1
+            alerts:UNIT_AURA(nil, "party2")
+            equal(#state.sounds, before + 1, "controlled teammate sounds once")
+            equal(alerts:IsAlertActive("party2", alert), 20, "controlled teammate has the alert")
+            equal(state.flashes.party2, color, "controlled teammate flashes")
+            alerts:UNIT_AURA(nil, "party2")
+            alerts:UNIT_AURA(nil, "party1")
+            equal(#state.sounds, before + 1, "repeated scans and the caster stay silent")
+            charmed.party2 = nil
+            alerts:UNIT_AURA(nil, "party2")
+            equal(alerts:IsAlertActive("party2", alert), false, "ending control clears the alert")
+            equal(state.flashes.party2, nil, "ending control stops flashing even if aura lingers")
+            charmed.party2 = 1
+            alerts:UNIT_AURA(nil, "party2")
+            equal(#state.sounds, before + 2, "a later control sounds again")
+            state.auras[filter] = {}
+            alerts:UNIT_AURA(nil, "party2")
+            equal(alerts:IsAlertActive("party2", alert), false, "aura removal clears the alert")
+        end
+        alerts.db.party.aurasSpells[31821] = {priority = 20, color = color, sound = soundName}
+        state.auras.HELPFUL = {{name = GetSpellInfo(31821), id = 31821}}
+        local before = #state.sounds
+        alerts:UNIT_AURA(nil, "party1")
+        equal(#state.sounds, before + 1, "other helpful auras still alert on an uncharmed teammate")
+    end)
+end
+
 test("healer-only party aura sounds use class only while specialization is unknown", function()
     local state, alerts = setup()
     alerts.db.party.aurasSpells[49010] = {priority = 20, color = color, sound = soundName, healerOnlySound = true}
